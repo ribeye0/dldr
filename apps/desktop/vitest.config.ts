@@ -1,0 +1,12 @@
+import { defineConfig } from "vitest/config";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { fileURLToPath } from "node:url";
+
+export default defineConfig({
+  plugins: [svelte({ compilerOptions: { hmr: false } })],
+  resolve: {
+    alias: { $data: fileURLToPath(new URL("../../resources", import.meta.url)), $lib: fileURLToPath(new URL("./src/lib", import.meta.url)) },
+    conditions: ["browser"],
+  },
+  test: { include: ["src/**/*.test.ts"], environment: "node" },
+});

@@ -1,0 +1,105 @@
+// Production UI against isolated IPC fixtures; never accesses an account or downloads files.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+const base = process.env.STORYBOOK_URL || 'http://localhost:6006';
+const captures = fs.mkdtempSync(path.join(os.tmpdir(),'dlsite-search-qa-'));
+const token = (kind,value) => `$${kind}:${value}$`;
+
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});
+ try {
+  const page=await browser.newPage({viewport:{width:1360,height:1000}});page.setDefaultTimeout(12000);
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(`${base}/iframe.html?id=app-production-workspace--interactive&viewMode=story`);
+  await page.getByText('Page 1 of 8',{exact:true}).first().waitFor();
+  const input=page.getByRole('combobox',{name:'Search library',exact:true});
+  const submit=page.getByRole('button',{name:'Search',exact:true});
+  const cards=page.locator('.product-card');
+  assert.equal(await page.getByRole('region',{name:'Search syntax help'}).count(),0);
+  assert.equal(await page.getByLabel('Exact search conditions',{exact:true}).count(),0);
+  assert.equal(await page.locator('datalist,[role=listbox]').count(),0);
+  assert.equal(await input.getAttribute('autocomplete'),'off');
+  const master=await page.evaluate(async()=>{
+   const invoke=window.__TAURI_INTERNALS__.invoke;window.__searchQa=[];
+   window.__TAURI_INTERNALS__.invoke=async(command,args,...rest)=>{
+    if(command==='list_products'||command==='list_product_filter_facets') window.__searchQa.push({command,args:JSON.parse(JSON.stringify(args))});
+    return invoke(command,args,...rest);
+   };
+   return invoke('list_products',{request:{search:null,accountIds:[],typeGroups:[],ageCategories:[],sourceGroups:[],makerKeys:[],sort:'latestPurchaseDesc',limit:500,offset:0}});
+  });
+  // Completion edits the draft only; Enter with an active option must not submit.
+  const requestsBeforeCompletion=await page.evaluate(()=>window.__searchQa.length);
+  await input.fill('$');
+  const suggestions=page.getByRole('listbox',{name:'Search suggestions',exact:true});
+  await suggestions.waitFor();
+  assert.equal(await suggestions.getByRole('option').count(),4);
+  await input.press('ArrowDown');await input.press('ArrowDown');await input.press('Tab');
+  assert.equal(await input.inputValue(),'$va:');
+  const actor=master.products.flatMap(p=>p.creditGroups.filter(g=>g.kind==='voice').flatMap(g=>g.names))[0];
+  await input.fill(`$va:${actor.slice(0,2)}`);
+  await suggestions.getByRole('option').filter({hasText:actor}).waitFor();
+  await input.press('ArrowDown');await input.press('Enter');
+  assert.equal(await input.inputValue(),token('va',actor));
+  assert.equal(await page.getByRole('listbox').count(),0);
+  assert.equal(await page.evaluate(()=>window.__searchQa.length),requestsBeforeCompletion);
+  const middle=`NTR $va:${actor.slice(0,2)}$ $tag:Whispering$`;
+  await input.fill(middle);
+  await input.evaluate((el,caret)=>el.setSelectionRange(caret,caret),middle.indexOf('$ $tag'));
+  await suggestions.waitFor();await suggestions.getByRole('option').filter({hasText:actor}).click();
+  assert.equal(await input.inputValue(),`NTR ${token('va',actor)} $tag:Whispering$`);
+  await input.fill('$tag:ささやき');await suggestions.waitFor();await input.press('Tab');
+  assert.equal(await input.inputValue(),'$tag:Whispering$');
+  await input.fill('$');await suggestions.waitFor();await input.press('Escape');await suggestions.waitFor({state:'hidden'});
+  assert.equal(await input.inputValue(),'$');await input.press('Tab');assert.equal(await input.inputValue(),'$');
+  await input.focus();await input.dispatchEvent('compositionstart');
+  assert.equal(await page.getByRole('listbox').count(),0);
+  await input.dispatchEvent('compositionend');await suggestions.waitFor();
+  await input.fill('NTR');assert.equal(await page.getByRole('listbox').count(),0);
+  await input.fill('');
+  assert.ok(await page.locator('.download-status .status-toggle').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=26));
+  async function search(value){await input.fill(value);await submit.click();await page.waitForFunction(()=>!document.querySelector('.empty-state')?.textContent.includes('Loading'));}
+  await search('Observatory');
+  assert.ok(await cards.count()>0);
+  assert.ok((await cards.allTextContents()).every(text=>text.includes('Observatory')));
+  const circle=(await cards.first().locator('.card-credits dd').first().innerText()).trim();
+  const voice=await cards.first().getByRole('button',{name:/^Search voice actor: /}).first().innerText();
+  const genre=await cards.first().getByRole('button',{name:/^Search tag:/}).first().innerText();
+  await cards.first().getByRole('button',{name:`Search circle: ${circle}`,exact:true}).click();
+  await page.waitForFunction(value=>document.querySelector('input[aria-label="Search library"]').value===value,`Observatory ${token('circle',circle)}`);
+  await cards.first().getByRole('button',{name:`Search voice actor: ${voice}`,exact:true}).click();
+  await cards.first().getByRole('button',{name:`Search tag: ${genre}`,exact:true}).click();
+  const combined=`Observatory ${token('circle',circle)} ${token('va',voice)} ${token('tag',genre)}`;
+  assert.equal(await input.inputValue(),combined);
+  await page.getByRole('button',{name:`Remove Genre condition: ${genre}`,exact:true}).waitFor();
+  const matches=master.products.filter(p=>p.title.includes('Observatory') && p.makerName===circle && p.creditGroups.some(g=>g.kind==='voice'&&g.names.includes(voice)) && p.tags?.some(t=>t.class==='genre'&&t.name===(require('../../resources/genres.json').find(g=>g.en===genre)?.zhTw ?? genre)));
+  await page.waitForFunction(count=>document.querySelectorAll('.product-card').length===count,matches.length);
+  await page.screenshot({path:path.join(captures,'combined.png')});
+  await search(`${combined} ${token('-tag',genre)}`);assert.equal(await cards.count(),0);
+  await page.getByRole('button',{name:`Remove Exclude genre condition: ${genre}`,exact:true}).click();
+  await page.waitForFunction(count=>document.querySelectorAll('.product-card').length===count,matches.length);
+  await search(token('circle',circle.slice(0,-1)));assert.equal(await cards.count(),0);
+  await search(`${token('va',voice)} ${token('tag',genre)}`);assert.ok(await cards.count()>0);
+  const lastQuery=await page.evaluate(()=>window.__searchQa.filter(r=>r.command==='list_products').at(-1).args.request);
+  assert.equal(lastQuery.search,`${token('va',voice)} ${token('tag',genre)}`);assert.equal(lastQuery.offset,0);
+  const countBefore=await page.evaluate(()=>window.__searchQa.length);
+  await input.fill('$tag:NTR');await page.getByRole('alert').filter({hasText:'Missing closing'}).waitFor();
+  assert.equal(await input.getAttribute('aria-invalid'),'true');
+  assert.equal(await submit.isDisabled(),true);assert.equal(await page.evaluate(()=>window.__searchQa.length),countBefore);
+  await input.fill('$price:100$');await page.getByRole('alert').filter({hasText:'Unsupported'}).waitFor();assert.equal(await submit.isDisabled(),true);
+  await page.screenshot({path:path.join(captures,'invalid-query.png')});
+  await page.getByRole('button',{name:'Clear search',exact:true}).click();await page.getByText('Page 1 of 8',{exact:true}).first().waitFor();
+  await page.getByRole('button',{name:'Search syntax',exact:true}).click();await page.getByRole('region',{name:'Search syntax help'}).waitFor();
+  await page.screenshot({path:path.join(captures,'syntax-help.png')});
+  const sidebar=await page.locator('aside nav button[aria-current=page]').evaluate(el=>({background:getComputedStyle(el).backgroundColor,shadow:getComputedStyle(el).boxShadow}));
+  assert.equal(sidebar.background,'rgb(34, 85, 170)');assert.ok(!sidebar.shadow.includes('255, 95, 150'));
+  await page.setViewportSize({width:390,height:844});await search(`${token('circle',circle)} ${token('va',voice)}`);
+  await page.screenshot({path:path.join(captures,'narrow.png')});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await input.fill('$');await suggestions.waitFor();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:path.join(captures,'completion-narrow.png')});
+  assert.deepEqual(errors,[]);console.log(`Product search QA passed: ${captures}`);
+ } finally {await browser.close();}
+})().catch(error=>{console.error(error);process.exit(1)});

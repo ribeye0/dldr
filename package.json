@@ -1,0 +1,30 @@
+{
+  "name": "dldr",
+  "version": "0.1.0-rc.1",
+  "description": "DLDR \u2014 DLsite Downloader: a desktop library and download manager.",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @dldr/desktop tauri dev",
+    "build": "pnpm --filter @dldr/desktop build",
+    "preview": "pnpm --filter @dldr/desktop preview",
+    "check": "pnpm --filter @dldr/desktop check",
+    "test": "pnpm --filter @dldr/desktop test",
+    "storybook": "pnpm --filter @dldr/desktop storybook",
+    "build-storybook": "pnpm --filter @dldr/desktop build-storybook",
+    "tauri": "pnpm --filter @dldr/desktop tauri"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ribeye0/dldr.git"
+  },
+  "homepage": "https://github.com/ribeye0/dldr",
+  "bugs": {
+    "url": "https://github.com/ribeye0/dldr/issues"
+  },
+  "private": true
+}

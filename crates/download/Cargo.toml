@@ -1,0 +1,24 @@
+[package]
+repository.workspace = true
+authors.workspace = true
+name = "dldr-download"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+fs2 = "0.4.3"
+dldr-api = { path = "../api" }
+dldr-archive = { path = "../archive" }
+thiserror = "2.0.20"
+tokio = { version = "1.53.1", features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
+url = "2.5.8"
+
+[dev-dependencies]
+dotenvy = "0.15.7"
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "test-util"] }
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,51 @@
+[package]
+name = "dldr-desktop"
+version.workspace = true
+description = "DLDR — DLsite Downloader: a desktop library and download manager."
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+default-run = "dldr-desktop"
+edition.workspace = true
+
+[lib]
+name = "dldr_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+async-trait = "0.1.92"
+dldr-api = { path = "../../../crates/api" }
+dldr-audit = { path = "../../../crates/audit" }
+dldr-credentials = { path = "../../../crates/credentials" }
+dldr-download = { path = "../../../crates/download" }
+dldr-jobs = { path = "../../../crates/jobs" }
+dldr-library = { path = "../../../crates/library" }
+dldr-player = { path = "../../../crates/player" }
+dldr-storage = { path = "../../../crates/storage" }
+tauri = { version = "2.11.5", features = [] }
+tauri-plugin-opener = "2.5.5"
+tauri-plugin-process = "2.3.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+uuid = { version = "1.26.0", features = ["v4"] }
+tokio = { version = "1.53.1", features = ["macros", "sync", "time"] }
+tauri-plugin-dialog = "2.7.3"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["registry"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18.2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+dldr-archive = { path = "../../../crates/archive" }
+tempfile = "3.27.0"
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+
+[lints]
+workspace = true

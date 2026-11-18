@@ -1,0 +1,64 @@
+/* Application-scoped GTK chrome. Preserve Tao's native titlebar and controls. */
+.dldr-native-window .dldr-headerbar {
+  min-height: 30px;
+  padding: 0 6px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid #b7d3f1;
+  border-radius: 0;
+  background-image: none;
+  background-color: #d9ecff;
+  color: #092a83;
+  box-shadow: none;
+}
+.dldr-native-window .dldr-headerbar .title {
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.dldr-native-window .dldr-headerbar button.titlebutton {
+  min-width: 28px;
+  min-height: 24px;
+  padding: 0;
+  margin: 3px 2px;
+  border: 0;
+  border-radius: 5px;
+  background-image: none;
+  background-color: transparent;
+  color: inherit;
+  box-shadow: none;
+  -gtk-icon-shadow: none;
+}
+.dldr-native-window .dldr-headerbar button.titlebutton:hover {
+  background-color: #bfdff7;
+}
+.dldr-native-window .dldr-headerbar button.titlebutton.close:hover {
+  background-color: #ffe2ed;
+  color: #932c55;
+}
+.dldr-native-window .dldr-headerbar button.titlebutton:focus {
+  outline: 1px solid #2255aa;
+  outline-offset: -2px;
+}
+.dldr-native-window .dldr-headerbar:backdrop {
+  color: #61718a;
+}
+.dldr-native-window.dldr-dark .dldr-headerbar {
+  background-color: #0c1424;
+  border-bottom-color: #2d405a;
+  color: #e6eefb;
+}
+.dldr-native-window.dldr-dark .dldr-headerbar button.titlebutton:hover {
+  background-color: #253f60;
+}
+.dldr-native-window.dldr-dark .dldr-headerbar button.titlebutton.close:hover {
+  background-color: #633248;
+  color: #ffeaf2;
+}
+.dldr-native-window.dldr-dark .dldr-headerbar button.titlebutton:focus {
+  outline-color: #80c8ff;
+}
+.dldr-native-window.dldr-dark .dldr-headerbar:backdrop {
+  color: #a0b1ca;
+}

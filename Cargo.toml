@@ -1,0 +1,13 @@
+[workspace]
+members = ["apps/cli", "apps/desktop/src-tauri", "crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0-rc.1"
+edition = "2021"
+license = "MIT"
+authors = ["ribeye0"]
+repository = "https://github.com/ribeye0/dldr"
+
+[workspace.lints.clippy]
+result_large_err = "allow"

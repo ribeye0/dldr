@@ -1,0 +1,64 @@
+@import "./tokens.css";
+
+@font-face {
+  font-family: "DLDR Noto Sans CJK";
+  src: url("/fonts/NotoSansCJKtc-VF-2.004.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --accent: var(--dldr-color-ui-accent);
+  --accent-strong: var(--dldr-color-ui-accent-hover);
+  --accent-muted: var(--dldr-color-ui-selected);
+  --bg: var(--dldr-color-ui-background);
+  --border: var(--dldr-color-ui-line);
+  --border-strong: var(--dldr-color-ui-line-strong);
+  --danger: var(--dldr-color-ui-error);
+  --field: var(--dldr-color-ui-input);
+  --field-disabled: var(--dldr-color-ui-surface-muted);
+  --muted: var(--dldr-color-ui-dim);
+  --panel: var(--dldr-color-ui-surface);
+  --panel-raised: var(--dldr-color-ui-elevated);
+  --panel-soft: var(--dldr-color-ui-surface-muted);
+  --text: var(--dldr-color-ui-ink);
+  --text-strong: var(--dldr-color-ui-ink);
+  --text-subtle: var(--dldr-color-ui-placeholder);
+  --focus-ring: var(--dldr-shadow-ui-focus-control);
+
+  background: var(--bg);
+  font-family:
+    "DLDR Noto Sans CJK",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+}
+
+body,
+button,
+input,
+select {
+  font: inherit;
+  letter-spacing: 0;
+}

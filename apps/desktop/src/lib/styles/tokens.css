@@ -1,0 +1,267 @@
+/* Shared application and Storybook tokens/utilities, without a Preflight reset. */
+@import "tailwindcss/theme.css" layer(theme) prefix(dldr);
+@import "tailwindcss/utilities.css" source(none);
+@source "../components";
+@source "../features";
+@source "../../routes";
+@source "../../../previews";
+
+/* Edit roles here to restyle the application without changing component markup. */
+@theme static {
+  --spacing: 4px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  /* DLDR palette: derive supporting shades from these five colors. */
+  --color-brand-navy: #092a83;
+  --color-brand-sky: #4baef3;
+  --color-brand-pink: #ff5f96;
+  --color-brand-blue: #2255aa;
+  --color-brand-white: #ffffff;
+  --color-ui-background: color-mix(in srgb, var(--dldr-color-brand-sky) 5%, var(--dldr-color-brand-white));
+  --color-ui-sidebar: var(--dldr-color-brand-navy);
+  --color-ui-surface: var(--dldr-color-brand-white);
+  --color-ui-surface-muted: color-mix(in srgb, var(--dldr-color-brand-sky) 9%, var(--dldr-color-brand-white));
+  --color-ui-elevated: var(--dldr-color-brand-white);
+  --color-ui-input: var(--dldr-color-brand-white);
+  --color-ui-ink: var(--dldr-color-brand-navy);
+  --color-ui-dim: color-mix(in srgb, var(--dldr-color-brand-navy) 78%, var(--dldr-color-brand-white));
+  --color-ui-placeholder: color-mix(in srgb, var(--dldr-color-brand-navy) 70%, var(--dldr-color-brand-white));
+  --color-ui-line: color-mix(in srgb, var(--dldr-color-brand-blue) 65%, var(--dldr-color-brand-white));
+  --color-ui-line-subtle: color-mix(in srgb, var(--dldr-color-brand-blue) 18%, var(--dldr-color-brand-white));
+  --color-ui-line-strong: var(--dldr-color-brand-blue);
+  --color-ui-accent: var(--dldr-color-brand-blue);
+  --color-ui-focus: var(--dldr-color-brand-blue);
+  --color-ui-focus-bg: var(--dldr-color-ui-selected);
+  --shadow-ui-focus-control: inset 0 -2px 0 var(--dldr-color-ui-focus);
+  --shadow-ui-focus-on-accent: inset 0 -2px 0 var(--dldr-color-brand-white);
+  --color-ui-accent-hover: var(--dldr-color-brand-navy);
+  --color-ui-on-accent: var(--dldr-color-brand-white);
+  --color-ui-hover: color-mix(in srgb, var(--dldr-color-brand-sky) 18%, var(--dldr-color-brand-white));
+  --color-ui-row-hover: color-mix(in srgb, var(--dldr-color-brand-sky) 8%, var(--dldr-color-brand-white));
+  --color-ui-selected: color-mix(in srgb, var(--dldr-color-brand-sky) 20%, var(--dldr-color-brand-white));
+  --color-ui-selected-text: var(--dldr-color-brand-navy);
+  --color-ui-selected-strong: color-mix(in srgb, var(--dldr-color-brand-sky) 38%, var(--dldr-color-brand-white));
+  --color-ui-selected-border: var(--dldr-color-brand-blue);
+  --color-ui-selection-mark: var(--dldr-color-brand-pink);
+  --color-ui-on-selection-mark: var(--dldr-color-brand-navy);
+  /* Pink itself is decorative; darken its error text for readable light surfaces. */
+  --color-ui-error: color-mix(in srgb, var(--dldr-color-brand-pink) 50%, var(--dldr-color-brand-navy));
+  --color-ui-error-bg: color-mix(in srgb, var(--dldr-color-brand-pink) 10%, var(--dldr-color-brand-white));
+  --color-ui-error-border: color-mix(in srgb, var(--dldr-color-brand-pink) 60%, var(--dldr-color-brand-navy));
+  --color-ui-available: var(--dldr-color-brand-blue);
+  --color-ui-queued: var(--dldr-color-ui-error);
+  --color-ui-in-progress: var(--dldr-color-brand-blue);
+  --color-ui-status-bg: color-mix(in srgb, var(--dldr-color-brand-white) 96%, transparent);
+  --color-ui-tag-bg: color-mix(in srgb, var(--dldr-color-brand-pink) 12%, var(--dldr-color-brand-white));
+  --color-ui-tag-border: var(--dldr-color-brand-navy);
+  --color-ui-tag-text: var(--dldr-color-brand-navy);
+  --color-ui-tag-hover: color-mix(in srgb, var(--dldr-color-brand-pink) 22%, var(--dldr-color-brand-white));
+  --color-ui-genre-bg: color-mix(in srgb, var(--dldr-color-brand-sky) 12%, var(--dldr-color-brand-white));
+  --color-ui-genre-border: var(--dldr-color-brand-navy);
+  --color-ui-genre-text: var(--dldr-color-brand-blue);
+  --color-ui-progress-track: color-mix(in srgb, var(--dldr-color-brand-sky) 20%, var(--dldr-color-brand-white));
+  --color-ui-backdrop: color-mix(in srgb, var(--dldr-color-brand-navy) 58%, transparent);
+  --color-ui-shadow: color-mix(in srgb, var(--dldr-color-brand-navy) 12%, transparent);
+  --color-ui-shadow-strong: color-mix(in srgb, var(--dldr-color-brand-navy) 22%, transparent);
+  /* Exact work-kind swatches supplied by the user; text stays navy. */
+  --color-kind-audio-bg: #feecdf;
+  --color-kind-comic-bg: #dff4e6;
+  --color-kind-game-bg: #f1eafd;
+  --color-kind-illustration-bg: #e9f5ff;
+  --color-kind-video-bg: #f5eaff;
+  --color-kind-other-bg: #eeeeee;
+  --color-kind-audio-border: var(--dldr-color-brand-navy);
+  --color-kind-comic-border: var(--dldr-color-brand-navy);
+  --color-kind-game-border: var(--dldr-color-brand-navy);
+  --color-kind-illustration-border: var(--dldr-color-brand-navy);
+  --color-kind-video-border: var(--dldr-color-brand-navy);
+  --color-kind-other-border: var(--dldr-color-brand-navy);
+  --color-kind-audio-text: var(--dldr-color-brand-navy);
+  --color-kind-comic-text: var(--dldr-color-brand-navy);
+  --color-kind-game-text: var(--dldr-color-brand-navy);
+  --color-kind-illustration-text: var(--dldr-color-brand-navy);
+  --color-kind-video-text: var(--dldr-color-brand-navy);
+  --color-kind-other-text: var(--dldr-color-brand-navy);
+  /* Existing combined image/comic filters and voice-comic views share these roles. */
+  --color-kind-image-bg: var(--dldr-color-kind-illustration-bg);
+  --color-kind-image-border: var(--dldr-color-kind-illustration-border);
+  --color-kind-image-text: var(--dldr-color-brand-navy);
+  --color-kind-voice-comic-bg: var(--dldr-color-kind-comic-bg);
+  --color-kind-voice-comic-border: var(--dldr-color-kind-comic-border);
+  --color-kind-voice-comic-text: var(--dldr-color-brand-navy);
+  --color-source-owned-bg: var(--dldr-color-ui-genre-bg);
+  --color-source-owned-text: var(--dldr-color-brand-blue);
+  --color-source-local-bg: var(--dldr-color-ui-tag-bg);
+  --color-source-local-text: var(--dldr-color-ui-error);
+  --color-age-all-bg: #6ac921;
+  --color-age-all-border: var(--dldr-color-brand-navy);
+  --color-age-all-text: var(--dldr-color-brand-navy);
+  --color-age-r15-bg: var(--dldr-color-ui-tag-bg);
+  --color-age-r15-border: var(--dldr-color-ui-tag-border);
+  --color-age-r15-text: var(--dldr-color-brand-navy);
+  --color-age-r18-bg: #ff91b7;
+  --color-age-r18-border: var(--dldr-color-brand-navy);
+  --color-age-r18-text: var(--dldr-color-brand-navy);
+}
+
+/* Keep brand artwork and the user's categorical badge swatches unchanged.
+   Theme overrides affect semantic surfaces, text and interaction roles only. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --dldr-color-ui-background: #0c1424;
+  --dldr-color-ui-sidebar: #0a1220;
+  --dldr-color-ui-surface: #152238;
+  --dldr-color-ui-surface-muted: #192940;
+  --dldr-color-ui-elevated: #1c2d46;
+  --dldr-color-ui-input: #101c2f;
+  --dldr-color-ui-ink: #e6eefb;
+  --dldr-color-ui-dim: #abbdd6;
+  --dldr-color-ui-placeholder: #95abc9;
+  --dldr-color-ui-line: #60789a;
+  --dldr-color-ui-line-subtle: #2d405a;
+  --dldr-color-ui-line-strong: #6c90bc;
+  --dldr-color-ui-accent: #80c8ff;
+  --dldr-color-ui-accent-hover: #addcff;
+  --dldr-color-ui-on-accent: #0b1a2d;
+  --dldr-color-ui-focus: #80c8ff;
+  --dldr-shadow-ui-focus-on-accent: inset 0 -2px 0 #0b1a2d;
+  --dldr-color-ui-hover: #253f60;
+  --dldr-color-ui-row-hover: #1c304a;
+  --dldr-color-ui-selected: #223d60;
+  --dldr-color-ui-selected-text: #e6eefb;
+  --dldr-color-ui-selected-strong: #345a85;
+  --dldr-color-ui-selected-border: #80c8ff;
+  --dldr-color-ui-error: #ff94bb;
+  --dldr-color-ui-error-bg: #38253a;
+  --dldr-color-ui-error-border: #b66084;
+  --dldr-color-ui-available: #80c8ff;
+  --dldr-color-ui-in-progress: #80c8ff;
+  --dldr-color-ui-status-bg: #1c2d46;
+  --dldr-color-ui-tag-bg: #382940;
+  --dldr-color-ui-tag-border: #b77c9d;
+  --dldr-color-ui-tag-text: #ffb1cd;
+  --dldr-color-ui-tag-hover: #50354f;
+  --dldr-color-ui-genre-bg: #1a344b;
+  --dldr-color-ui-genre-border: #668dbb;
+  --dldr-color-ui-genre-text: #9ed9ff;
+  --dldr-color-ui-progress-track: #2a405c;
+  --dldr-color-ui-backdrop: #020817b8;
+  --dldr-color-ui-shadow: #00000040;
+  --dldr-color-ui-shadow-strong: #00000080;
+  --dldr-color-source-owned-text: var(--dldr-color-ui-genre-text);
+  --dldr-color-age-r15-text: var(--dldr-color-ui-tag-text);
+}
+
+/* Keep every gallery at six columns or fewer, retaining compact-window sizing. */
+.work-grid {
+  --work-grid-gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(
+    min(100%, max(clamp(165px, calc(115px + 5vw), 220px), calc((100% - 5 * var(--work-grid-gap)) / 6))),
+    1fr
+  ));
+  gap: 24px var(--work-grid-gap);
+}
+
+/* Creator names remain individual, wrapping pills in both cards and details. */
+.voice-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+}
+.voice-chip {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid var(--dldr-color-ui-genre-border);
+  border-radius: 999px;
+  background: var(--dldr-color-ui-surface);
+  color: var(--dldr-color-ui-ink);
+  font: inherit;
+  line-height: 1.6;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+button.voice-chip { cursor: pointer; }
+button.voice-chip:hover { background: var(--dldr-color-ui-genre-bg); }
+.voice-chip:focus-visible {
+  outline: 2px solid var(--dldr-color-ui-focus);
+  outline-offset: 2px;
+}
+
+/* Shared keyboard focus: keep indicators inside the control's existing bounds. */
+@utility ui-focus-control {
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--dldr-shadow-ui-focus-control);
+  }
+  @media (forced-colors: active) {
+    &:focus-visible {
+      outline: 1px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+}
+
+@utility ui-focus-row {
+  &:focus-visible {
+    outline: none;
+    background-color: var(--dldr-color-ui-focus-bg);
+    box-shadow: inset 2px 0 0 var(--dldr-color-ui-focus);
+  }
+  @media (forced-colors: active) {
+    &:focus-visible {
+      outline: 1px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+}
+
+@utility ui-focus-text {
+  &:focus-visible {
+    outline: none;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+}
+
+@utility ui-focus-field {
+  &:focus {
+    --ui-field-border: var(--dldr-color-ui-focus);
+    outline: none;
+    border-color: var(--dldr-color-ui-focus);
+    box-shadow: none;
+  }
+  @media (forced-colors: active) {
+    &:focus {
+      outline: 1px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+}
+
+@utility ui-focus-image {
+  position: relative;
+  &:focus-visible {
+    outline: none;
+  }
+  &:focus-visible::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--dldr-color-ui-focus);
+    pointer-events: none;
+  }
+  @media (forced-colors: active) {
+    &:focus-visible {
+      outline: 1px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+}
