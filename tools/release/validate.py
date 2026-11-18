@@ -10,17 +10,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def validate(tag=None):
-    package = json.loads((ROOT / "package.json").read_text())
-    config = json.loads((ROOT / "apps/desktop/src-tauri/tauri.conf.json").read_text())
-    desktop = tomllib.loads((ROOT / "apps/desktop/src-tauri/Cargo.toml").read_text())
-    workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]
+    package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    config = json.loads((ROOT / "apps/desktop/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+    desktop = tomllib.loads((ROOT / "apps/desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8"))
+    workspace = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))["workspace"]["package"]
     if config["identifier"] != "io.github.ribeye0.dldr" or config["productName"] != "DLDR":
         raise ValueError("Desktop identity must use DLDR / io.github.ribeye0.dldr")
     if desktop["package"]["name"] != "dldr-desktop" or desktop["lib"]["name"] != "dldr_desktop_lib":
         raise ValueError("Native package and library names must use DLDR")
-    versions = {"package.json": package["version"], "tauri.conf.json": config["version"], "desktop/package.json": json.loads((ROOT/"apps/desktop/package.json").read_text())["version"]}
+    versions = {"package.json": package["version"], "tauri.conf.json": config["version"], "desktop/package.json": json.loads((ROOT/"apps/desktop/package.json").read_text(encoding="utf-8"))["version"]}
     for file in ["apps/desktop/src-tauri/Cargo.toml", "apps/cli/Cargo.toml"]:
-        value = tomllib.loads((ROOT / file).read_text())["package"]["version"]
+        value = tomllib.loads((ROOT / file).read_text(encoding="utf-8"))["package"]["version"]
         versions[file] = workspace["version"] if isinstance(value, dict) and value.get("workspace") else value
     if len(set(versions.values())) != 1:
         raise ValueError(f"Release versions differ: {versions}")
@@ -32,9 +32,9 @@ def validate(tag=None):
     if config["bundle"]["createUpdaterArtifacts"] or config.get("plugins", {}).get("updater"):
         raise ValueError("This release channel uses manual updates, not updater artifacts")
     repository = "https://github.com/ribeye0/dldr"
-    if package.get("homepage") != repository or f'GITHUB_URL = "{repository}"' not in (ROOT / "apps/desktop/src/lib/model/constants.ts").read_text():
+    if package.get("homepage") != repository or f'GITHUB_URL = "{repository}"' not in (ROOT / "apps/desktop/src/lib/model/constants.ts").read_text(encoding="utf-8"):
         raise ValueError("Project/release links must point to ribeye0/dldr")
-    locked = tomllib.loads((ROOT / "Cargo.lock").read_text())
+    locked = tomllib.loads((ROOT / "Cargo.lock").read_text(encoding="utf-8"))
     for name in ["dldr-desktop", "dldr-cli"]:
         if next(p["version"] for p in locked["package"] if p["name"] == name) != version:
             raise ValueError(f"Cargo.lock version differs for {name}")

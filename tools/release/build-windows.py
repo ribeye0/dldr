@@ -24,14 +24,14 @@ TARGET = 'x86_64-pc-windows-msvc'
 
 def run(*args, capture=False):
     if capture:
-        return subprocess.check_output(args, text=True).strip()
+        return subprocess.check_output(args, text=True, encoding="utf-8").strip()
     subprocess.run(args, check=True)
 
 
 def bundle_runtime(stage, cache, source_dir):
     """Ship pinned MSYS2 DLLs, notices and their exact source packages."""
     manifest = Path(__file__).with_name('windows-runtime.json')
-    packages = json.loads(manifest.read_text())
+    packages = json.loads(manifest.read_text(encoding="utf-8"))
     downloads = {}
     for package in packages:
         downloads[package['url']] = package['sha256']
@@ -88,7 +88,7 @@ def cross_unrar(cache):
         shutil.rmtree(destination)
     shutil.copytree(Path(package['manifest_path']).parent, destination)
     script = destination / 'build.rs'
-    text = script.read_text()
+    text = script.read_text(encoding="utf-8")
     if text.count('#[cfg(windows)]') != 2 or 'if cfg!(windows)' not in text:
         raise RuntimeError('Unrecognized UnRAR build script.')
     text = text.replace('cfg!(windows)', 'std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")')
@@ -107,7 +107,7 @@ def cross_unrar(cache):
     for path in (destination / 'vendor/unrar').iterdir():
         if path.suffix not in {'.hpp', '.cpp', '.h'}:
             continue
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         text = re.sub(r'(#\s*include\s*[<"])([^>"\n]+)([>"])',
                       lambda m: m[1] + lookup.get(m[2].lower(), m[2]) + m[3], text)
         text = re.sub(r'(#pragma\s+comment\s*\(\s*lib,\s*")([^"]+)(")',

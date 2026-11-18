@@ -17,7 +17,7 @@ sudo apt-get update
 sudo apt-get install --yes --no-install-recommends build-essential curl file pkg-config patchelf \
   libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev \
   libmpv2 fonts-noto-cjk ffmpeg gstreamer1.0-libav gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-  python3 python3-requests dpkg-dev xz-utils zstd xvfb xauth webkit2gtk-driver dbus-x11
+  python3 python3-requests dpkg-dev xz-utils zstd xvfb xauth webkit2gtk-driver dbus-x11 pulseaudio
 pnpm install --frozen-lockfile
 cargo fetch --locked
 python3 tools/release/validate.py

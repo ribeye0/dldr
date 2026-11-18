@@ -9,7 +9,7 @@ import subprocess
 
 
 def run(*args):
-    return subprocess.check_output(args, text=True).strip()
+    return subprocess.check_output(args, text=True, encoding="utf-8").strip()
 
 
 def collect_code_notices(doc, target=None):
@@ -42,7 +42,7 @@ def collect_code_notices(doc, target=None):
             continue
         seen.add(folder)
         try:
-            data = json.loads(manifest.read_text())
+            data = json.loads(manifest.read_text(encoding="utf-8"))
         except (ValueError, OSError):
             continue
         if "name" not in data or "version" not in data:
@@ -62,7 +62,7 @@ def collect(appdir, output):
     exact, basenames = {}, {}
     for listing in Path("/var/lib/dpkg/info").glob("*.list"):
         package = listing.name.removesuffix(".list")
-        for line in listing.read_text().splitlines():
+        for line in listing.read_text(encoding="utf-8").splitlines():
             exact.setdefault(line, set()).add(package)
             basenames.setdefault(Path(line).name, set()).add(package)
     owners, files, unknown = set(), [], []
@@ -82,7 +82,7 @@ def collect(appdir, output):
         files.append({"path": str(relative), "packages": sorted(packages)})
     if unknown:
         raise RuntimeError(f"Bundled ELF files without a source package: {unknown}")
-    tools = json.loads(Path(__file__).with_name("tools.json").read_text())
+    tools = json.loads(Path(__file__).with_name("tools.json").read_text(encoding="utf-8"))
     loader = appdir / ("AppRun.wrapped" if (appdir / "AppRun.wrapped").exists() else "AppRun")
     assert hashlib.sha256(loader.read_bytes()).hexdigest() == tools["AppRun-x86_64"]["sha256"], "Unknown AppRun loader"
     shutil.copyfile(Path(__file__).with_name("tools.json"), doc / "bundler-tools.json")

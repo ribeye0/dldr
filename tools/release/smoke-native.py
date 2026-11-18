@@ -60,7 +60,7 @@ def media_probe(appdir, media):
         mpv.mpv_terminate_destroy(handle)
 
 
-def native_probe(appdir, temporary, qa):
+def native_probe(appdir, temporary, qa, pulse_server):
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0)); port = probe.getsockname()[1]
     stubs = temporary / "bin"; stubs.mkdir()
@@ -74,6 +74,7 @@ def native_probe(appdir, temporary, qa):
     config.mkdir()
     (config / "user-dirs.dirs").write_text(f'XDG_DOWNLOAD_DIR="{downloads}"\n')
     env = os.environ | {"PATH": str(stubs) + ":" + os.environ["PATH"], "DLDR_QA_URL_LOG": str(url_log),
+                        "PULSE_SERVER": pulse_server,
                         "XDG_DATA_HOME": str(temporary / "data"), "XDG_CONFIG_HOME": str(temporary / "config"),
                         "XDG_CACHE_HOME": str(temporary / "cache"), "TAURI_WEBVIEW_AUTOMATION": "true",
                         "WEBKIT_DISABLE_DMABUF_RENDERER": "1", "GDK_BACKEND": "x11", "LC_ALL": "zh_TW.UTF-8"}
@@ -367,7 +368,37 @@ def main(output):
         login = subprocess.run([str(cli_dir / "dldr"), "--data-dir", str(login_profile), "login"], input="", capture_output=True, text=True)
         assert login.returncode != 0 and "terminal" in login.stderr.lower(), login.stderr
         assert not login_profile.exists()
-        native = native_probe(appdir, temporary, qa)
+        # A headless runner has no physical sound device. Exercise the real
+        # player against a private timed sink without depending on host audio.
+        socket_path = temporary / "pulse.socket"
+        audio_runtime = temporary / "pulse-runtime"
+        audio_runtime.mkdir(mode=0o700)
+        with (qa / "audio.log").open("w") as log:
+            audio = subprocess.Popen([
+                "pulseaudio", "-n", "--daemonize=no", "--exit-idle-time=-1",
+                "--use-pid-file=no", "--disable-shm=yes",
+                "--load=module-null-sink sink_name=dldr_qa",
+                f"--load=module-native-protocol-unix socket={socket_path} auth-anonymous=1",
+            ], stdout=log, stderr=log, env=os.environ | {
+                "XDG_RUNTIME_DIR": str(audio_runtime),
+                "XDG_CONFIG_HOME": str(temporary / "pulse-config"),
+            })
+            try:
+                for _ in range(100):
+                    if socket_path.exists():
+                        break
+                    if audio.poll() is not None:
+                        raise RuntimeError("QA audio server failed; see audio.log")
+                    time.sleep(.1)
+                else:
+                    raise RuntimeError("QA audio server did not create its socket")
+                native = native_probe(appdir, temporary, qa, f"unix:{socket_path}")
+            finally:
+                audio.terminate()
+                try:
+                    audio.wait(5)
+                except subprocess.TimeoutExpired:
+                    audio.kill(); audio.wait()
         report = {"media": json.loads(result.splitlines()[-1]), "native": native, "cli": {"versionMatches": True, "redirectedLoginRejectedBeforeWrites": True}, "realAccountUsed": False,
                   "remaining": ["authenticated official playback", "simultaneous purchased-work GUI download acceptance", "additional desktop distributions"]}
         (qa / "acceptance.json").write_text(json.dumps(report, indent=2) + "\n")
