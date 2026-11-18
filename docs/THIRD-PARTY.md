@@ -67,12 +67,18 @@ a publisher signature.
 The DLDR logo was supplied by the project owner. Genre data comes from DLsite.
 Product artwork and purchased media are not distributed in DLDR release packages.
 
-## Windows test candidate
+## Windows runtime
 
-The Windows candidate uses the first-party mpv LGPL build, pinned by URL and
-SHA256 in `tools/release/build-windows.py`. Its LGPL text, native/Rust/JavaScript
-notices and runtime provenance are shipped under `third-party/`. Users can replace
-`libmpv-2.dll` beside the executable. Windows credentials and media are never
-included. Public distribution still requires the exact complete corresponding
-sources for mpv and its statically linked components; the application source
-snapshot alone does not supply those runtime sources. See [Windows checks](windows.md).
+Windows bundles pinned MSYS2 UCRT64 builds of libmpv, FFmpeg, libarchive and
+only their required DLL dependencies. Exact package versions, selected files,
+SHA256 hashes and source-package URLs are recorded in
+`tools/release/windows-runtime.json` and shipped under `third-party/`.
+The DLLs remain replaceable beside the executable.
+
+These builds include GPL-licensed components; **the complete Windows package is
+not exclusively MIT-licensed**. License notices accompany the binaries. The
+matching Windows runtime source archive contains each exact MSYS2 source package
+(upstream sources, patches and PKGBUILD recipes) and vendored Rust dependencies,
+including native C/C++ sources. The application source archive contains DLDR and
+its packaging scripts. Both source archives accompany every Windows release.
+User credentials and purchased media are never included.

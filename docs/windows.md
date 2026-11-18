@@ -1,12 +1,14 @@
-# DLDR Windows 測試版
+# DLDR Windows
 
-目標為 **Windows 11 x64**。這是尚待原生驗收、未簽署的測試建置。
+支援 **Windows 11 x64**。安裝檔尚未使用程式碼簽署憑證，Windows 可能顯示 SmartScreen 提示。
 
 ## 啟動
 
 解壓縮 `DLDR_VERSION_windows_x64.zip`，開啟其中 `DLDR/DLDR.Desktop.exe`。
-請保留同資料夾的 `libmpv-2.dll` 及 `third-party`；只複製 EXE 會使本機播放器
-無法載入。程式資料保存在 Windows 使用者的應用程式資料目錄，並非解壓縮目錄。
+請保留整個 `DLDR` 資料夾，包括 mpv、libarchive 的 DLL 與 `third-party`；
+只複製 EXE 會使播放器或壓縮檔讀取無法載入。程式資料保存在 Windows
+使用者的應用程式資料目錄，並非解壓縮目錄。免安裝版與安裝版共用此設定目錄，
+測試時請分別啟動，不要同時執行。
 資料庫、帳號憑證、播放紀錄、日誌及瀏覽器資料統一存於 `%APPDATA%\dldr\`。
 `%LOCALAPPDATA%\DLDR\` 是安裝目錄，並非設定目錄。
 Linux 的帳號與下載資料不會自動搬入 Windows。
@@ -49,7 +51,8 @@ Linux 的帳號與下載資料不會自動搬入 Windows。
 - 中文／日文與空白路徑、安裝／移除、更新後保留資料。
 
 Wine 可用於部分 CLI、DLL 與檔案操作檢查；其 WebView2 相容性不能替代 Windows 11
-桌面驗收。測試不應共用 Linux 實帳 profile。公開發佈前須完成原生驗收，並依
-[發佈流程](https://github.com/ribeye0/dldr/blob/main/docs/releasing.md) 整理第三方通知與
-精確對應的完整 runtime 原始碼；測試包中的應用程式 source archive 不包含所有
-libmpv 靜態相依套件的原始碼。
+桌面驗收。測試不應共用 Linux 實帳 profile。
+
+同一 Release 提供應用程式與 Windows runtime 原始碼壓縮檔；後者包含
+libmpv、FFmpeg、libarchive 及相依 DLL 的精確對應來源與建置配方。
+下載後可使用 `SHA256SUMS.txt` 檢查檔案完整性。

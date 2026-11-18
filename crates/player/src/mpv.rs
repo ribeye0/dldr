@@ -5,6 +5,7 @@ use libloading::Library;
 use std::{
     ffi::{c_char, c_int, c_ulong, c_void, CString},
     ptr,
+    sync::{Arc, Mutex, OnceLock},
 };
 
 #[repr(C)]
@@ -38,10 +39,17 @@ pub struct Mpv {
     command_fn: Command,
     wait: Wait,
     // Retain library until after the handle has been destroyed.
-    _library: Library,
+    _library: Arc<Library>,
 }
 impl Mpv {
     pub fn new(null_audio: bool) -> Result<Self> {
+        // Codec libraries can own process-wide callbacks and worker state.
+        // Retain one successful load across player/probe handle lifetimes.
+        static LIBRARY: OnceLock<Mutex<Option<Arc<Library>>>> = OnceLock::new();
+        let mut cached = LIBRARY
+            .get_or_init(|| Mutex::new(None))
+            .lock()
+            .map_err(|_| Error::EngineInitialization)?;
         #[cfg(target_os = "linux")]
         let names = ["libmpv.so.2"];
         #[cfg(target_os = "macos")]
@@ -53,19 +61,27 @@ impl Mpv {
         let sibling = std::env::current_exe()
             .ok()
             .and_then(|p| p.parent().map(|p| p.to_path_buf()));
-        let library = names
-            .iter()
-            .find_map(|name| {
-                // SAFETY: only trusted application-adjacent/system library names;
-                // all symbols below use the documented libmpv C ABI.
-                unsafe {
-                    sibling
-                        .as_ref()
-                        .and_then(|p| Library::new(p.join(name)).ok())
-                        .or_else(|| Library::new(name).ok())
-                }
-            })
-            .ok_or(Error::EngineUnavailable)?;
+        let library = if let Some(library) = cached.as_ref() {
+            library.clone()
+        } else {
+            let loaded = names
+                .iter()
+                .find_map(|name| {
+                    // SAFETY: only trusted application-adjacent/system library names;
+                    // all symbols below use the documented libmpv C ABI.
+                    unsafe {
+                        sibling
+                            .as_ref()
+                            .and_then(|p| Library::new(p.join(name)).ok())
+                            .or_else(|| Library::new(name).ok())
+                    }
+                })
+                .ok_or(Error::EngineUnavailable)?;
+            let library = Arc::new(loaded);
+            *cached = Some(library.clone());
+            library
+        };
+        drop(cached);
         unsafe {
             let version: unsafe extern "C" fn() -> c_ulong = *library
                 .get(b"mpv_client_api_version\0")

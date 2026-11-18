@@ -1,4 +1,4 @@
-name: DLDR release candidate
+name: DLDR release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing DLDR tag, e.g. v0.1.0-rc.1
+        description: Existing DLDR tag, e.g. v0.1.0
         required: true
         type: string
 
@@ -16,6 +16,11 @@ permissions:
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
   prepare:
@@ -45,6 +50,8 @@ jobs:
     needs: prepare
     runs-on: ubuntu-24.04
     steps:
+      - name: Free unused runner SDK space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.tag }}
@@ -81,7 +88,9 @@ jobs:
           cargo fmt --all --check
           cargo clippy --locked --workspace --all-targets -- -D warnings
           cargo test --locked --workspace
-      - name: Build candidate and source/notice archives
+      - name: Free validation build space
+        run: cargo clean --profile dev
+      - name: Build release and source/notice archives
         run: bash tools/release/build-linux.sh
       - name: Verify packaged media and native UI
         run: dbus-run-session -- xvfb-run -a python3 tools/release/smoke-native.py target/dist/release
@@ -98,17 +107,87 @@ jobs:
           path: target/dist/qa/*
           if-no-files-found: ignore
 
-  draft:
-    needs: [prepare, linux]
+  windows:
+    needs: prepare
+    runs-on: windows-2025
+    env:
+      RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: 1.100.0
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: pnpm install --frozen-lockfile
+      - run: cargo fetch --locked
+      - name: Build portable ZIP, installer and sources
+        run: python tools/release/build-windows.py
+      - name: Install codec test tools
+        run: choco install ffmpeg --yes --no-progress
+      - name: Validate Windows source and packaged player
+        shell: pwsh
+        run: |
+          cargo fmt --all --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:PATH = "$PWD\target\dist\windows\DLDR;$env:PATH"
+          cargo test --locked --workspace
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --locked -p dldr-player native_codec_probe_and_missing_file_errors -- --ignored
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --locked -p dldr-player archive_ -- --ignored --test-threads=1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --locked -p dldr-player native_playback_seek_subtitles_resume_and_group_eof -- --ignored
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --locked -p dldr-player native_seek_recovers -- --ignored
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dldr-windows-x86_64
+          path: |
+            target/dist/windows/*.zip
+            target/dist/windows/*setup.exe
+            target/dist/windows/*.tar.gz
+            target/dist/windows/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, linux, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: dldr-linux-x86_64
-          path: target/dist/release
-      - name: Create a draft for final review
+          pattern: dldr-*-x86_64
+          path: artifacts
+      - name: Verify and prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release
+          for platform in linux windows; do
+            dir="artifacts/dldr-$platform-x86_64"
+            (cd "$dir"; sha256sum --check SHA256SUMS.txt)
+            cp "$dir/SHA256SUMS.txt" "release/SHA256SUMS-$platform.txt"
+            find "$dir" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec cp -t release {} +
+          done
+          cat release/SHA256SUMS-linux.txt release/SHA256SUMS-windows.txt > release/SHA256SUMS.txt
+          rm release/SHA256SUMS-linux.txt release/SHA256SUMS-windows.txt
+          (cd release; sha256sum --check SHA256SUMS.txt)
+      - name: Upload and publish verified stable release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -116,14 +195,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd target/dist/release
-          sha256sum --check SHA256SUMS.txt
-          if gh release view "$TAG" --json isDraft --jq .isDraft > release-state.txt; then
-            [[ $(cat release-state.txt) == true ]] || { echo 'Refusing to overwrite a public release' >&2; exit 1; }
+          cd release
+          if gh release view "$TAG" --json isDraft --jq .isDraft > ../release-state.txt; then
+            [[ $(cat ../release-state.txt) == true ]] || { echo 'Refusing to overwrite a published release' >&2; exit 1; }
           else
             flags=(--draft)
             [[ "$TAG" != *-rc.* ]] || flags+=(--prerelease)
             gh release create "$TAG" --verify-tag --title "DLDR ${TAG#v}" --notes-file RELEASE-NOTES.md "${flags[@]}"
           fi
-          rm -f release-state.txt
           gh release upload "$TAG" ./* --clobber
+          if [[ "$TAG" != *-rc.* ]]; then
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi

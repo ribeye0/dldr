@@ -198,6 +198,9 @@ impl Installation {
         tracing::info!(target:"dldr_diagnostic",phase="finalize_install",status="running","Filesystem phase started");
         let result: Result<()> = async {
             if let Some(old) = &self.record.old_path {
+                if self.backup().try_exists()? {
+                    return Err(self.required("backup destination appeared during installation"));
+                }
                 tokio::fs::rename(old, self.backup()).await?;
             }
             if Path::new(&self.record.final_path).try_exists()? {
@@ -448,7 +451,12 @@ fn copy_tree(source: &Path, destination: &Path) -> io::Result<()> {
             copy_tree(&entry.path(), &target)?;
         } else if kind.is_file() {
             let expected = entry.metadata()?.len();
-            if std::fs::copy(entry.path(), target)? != expected {
+            std::fs::copy(entry.path(), &target)?;
+            // Verify the resulting files directly, including on compatibility
+            // layers whose CopyFileEx progress reports can be incomplete.
+            if std::fs::metadata(&target)?.len() != expected
+                || std::fs::metadata(entry.path())?.len() != expected
+            {
                 return Err(io::Error::other("source changed during copy"));
             }
         } else {

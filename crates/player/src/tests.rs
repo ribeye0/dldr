@@ -611,7 +611,12 @@ fn archive_ids_reject_paths_and_malformed_encoding() {
 #[ignore = "requires libarchive; only generated archive contents are used"]
 fn archive_scan_subtitles_encoding_and_unsafe_entries() {
     let d = tempfile::tempdir().unwrap();
-    let zip = d.path().join("作品%|.zip");
+    let archive_name = if cfg!(windows) {
+        "作品%#.zip"
+    } else {
+        "作品%|.zip"
+    };
+    let zip = d.path().join(archive_name);
     archive_zip(
         &zip,
         &[
@@ -636,7 +641,7 @@ fn archive_scan_subtitles_encoding_and_unsafe_entries() {
     let track = &media.tracks[0];
     assert_eq!(track.name, "01.wav");
     assert_eq!(track.size, 5);
-    let inside = archive::id("作品%|.zip", "音声/01.wav.vtt");
+    let inside = archive::id(archive_name, "音声/01.wav.vtt");
     assert_eq!(
         media::matched_subtitle(track, &media.subtitles),
         Some(inside.clone())
@@ -658,9 +663,10 @@ fn archive_scan_subtitles_encoding_and_unsafe_entries() {
         name: "other".into(),
     };
     assert_eq!(media::matched_subtitle(track, &[other]), None);
+    let encoded = if cfg!(windows) { "%25#" } else { "%25%7C" };
     assert!(media::playback_source(d.path(), &track.id)
         .unwrap()
-        .contains("%25%7C.zip|音声/01.wav"));
+        .contains(&format!("{encoded}.zip|音声/01.wav")));
     assert_eq!(
         vtt::parse(
             std::str::from_utf8(&media::subtitle_bytes(d.path(), &inside).unwrap()).unwrap()
@@ -693,7 +699,12 @@ fn archive_scan_subtitles_encoding_and_unsafe_entries() {
     fs::write(&cp932, bytes).unwrap();
     let entries = archive::entries(&cp932).unwrap();
     assert_eq!(entries[0].name, "音声.wav");
+    // Windows libarchive can expose a converted UTF-8 name where Unix returns
+    // no locale-compatible name. The displayed name must still be CP932.
+    #[cfg(not(windows))]
     assert_eq!(entries[0].stream_name, "mpv_unknown#0");
+    #[cfg(windows)]
+    assert!(!entries[0].stream_name.is_empty());
     fs::write(d.path().join("broken.zip"), b"broken").unwrap();
     let media = media::scan("RJ1".into(), d.path()).unwrap();
     assert_eq!(media.tracks.len(), 2);
@@ -709,7 +720,11 @@ fn archive_scan_subtitles_encoding_and_unsafe_entries() {
 #[ignore = "requires libmpv and libarchive; generated silent compressed WAV, null audio"]
 fn native_archive_playback_seek_subtitles_and_no_extraction() {
     let d = tempfile::tempdir().unwrap();
-    let root = d.path().join("作品%| dir");
+    let root = d.path().join(if cfg!(windows) {
+        "作品%# dir"
+    } else {
+        "作品%| dir"
+    });
     fs::create_dir(&root).unwrap();
     let wav_path = d.path().join("source.wav");
     wav(&wav_path, 12);
@@ -766,6 +781,46 @@ fn native_archive_playback_seek_subtitles_and_no_extraction() {
     assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
     let saved = fs::read_to_string(d.path().join("history.json")).unwrap();
     assert!(saved.contains("archive:"));
+}
+
+#[test]
+#[ignore = "requires libmpv and libarchive; generated CP932 ZIP, null audio"]
+fn native_cp932_archive_playback() {
+    let d = tempfile::tempdir().unwrap();
+    let source = d.path().join("source.wav");
+    wav(&source, 12);
+    let root = d.path().join("日本語 with spaces");
+    fs::create_dir(&root).unwrap();
+    let zip = root.join("音声.zip");
+    archive_zip(&zip, &[("1234.wav", &fs::read(source).unwrap())]);
+    let mut bytes = fs::read(&zip).unwrap();
+    let name = encoding_rs::SHIFT_JIS.encode("音声.wav").0.into_owned();
+    let positions: Vec<_> = bytes
+        .windows(8)
+        .enumerate()
+        .filter_map(|(i, b)| (b == b"1234.wav").then_some(i))
+        .collect();
+    for position in positions {
+        bytes[position..position + 8].copy_from_slice(&name);
+    }
+    fs::write(zip, bytes).unwrap();
+    let player = Player::start_inner(d.path().join("history.json"), true, |_| {});
+    let media = player.open("RJ1".into(), root).unwrap();
+    assert_eq!(media.tracks.len(), 1);
+    assert_eq!(media.tracks[0].name, "音声.wav");
+    player
+        .control(
+            "RJ1".into(),
+            Control::Play {
+                track_id: media.tracks[0].id.clone(),
+            },
+        )
+        .unwrap();
+    let snapshot = wait(&player, |s| {
+        s.error.is_some() || (s.duration > 11.9 && !s.loading)
+    });
+    assert!(snapshot.error.is_none(), "{snapshot:?}");
+    player.shutdown();
 }
 
 #[test]

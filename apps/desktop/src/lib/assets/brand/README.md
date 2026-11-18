@@ -4,13 +4,14 @@ DLDR is short for **DLsite Downloader**.
 
 - `dldr-source.png`: original artwork.
 - `dldr-logo.png`: cropped transparent logo used in the sidebar.
-- `dldr-icon.png`: square symbol used to generate desktop icons.
+- `dldr-icon.png`: square symbol with approximately 2% clear space per edge,
+  used to generate desktop icons without changing the original artwork.
 
 To regenerate the transparent assets, install Pillow and NumPy, then run:
 
 ```sh
 python3 tools/dev/prepare-brand.py
-pnpm tauri icon src/lib/assets/brand/dldr-icon.png -o /tmp/dldr-native-icons
+pnpm --filter @dldr/desktop exec tauri icon src/lib/assets/brand/dldr-icon.png -o /tmp/dldr-native-icons
 ```
 
 Copy the matching desktop icon sizes to `apps/desktop/src-tauri/icons/` and `64x64.png` to

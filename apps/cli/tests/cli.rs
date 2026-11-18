@@ -196,11 +196,8 @@ async fn cached_queries_are_read_only_and_work_while_another_process_owns_the_pr
     assert!(!text.contains("private-vault-key"));
     let open = invoke(temp.path(), &["open", "RJ000001", "--print"]);
     assert_eq!(
-        String::from_utf8(open.stdout).unwrap().trim(),
-        temp.path()
-            .join("作品庫 with spaces/RJ000001")
-            .to_str()
-            .unwrap()
+        Path::new(String::from_utf8(open.stdout).unwrap().trim()),
+        temp.path().join("作品庫 with spaces/RJ000001").as_path()
     );
     assert!(storage.download_queue().await.unwrap().is_empty());
     assert!(!temp.path().join("credentials").exists());

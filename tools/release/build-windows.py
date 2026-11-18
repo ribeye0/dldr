@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a Windows x64 test candidate: portable ZIP, CLI and optional NSIS installer."""
+"""Build Windows x64 releases with pinned runtimes and corresponding sources."""
 import argparse
 import hashlib
 import json
@@ -14,19 +14,67 @@ import tempfile
 import urllib.request
 import zipfile
 
+from concurrent.futures import ThreadPoolExecutor
+
 from notices import collect_code_notices
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = 'x86_64-pc-windows-msvc'
-RUNTIME_URL = ('https://github.com/mpv-player/mpv/releases/download/git-release/'
-               'libmpv-v0.42.0-dev-g543a8c2c5-43736525345-x86_64-w64-mingw32-lgpl.zip')
-RUNTIME_SHA256 = '7559e1fa0415866961611e6f5cf120c3ce43c8867b78fa43f825d704662c8845'
 
 
 def run(*args, capture=False):
     if capture:
         return subprocess.check_output(args, text=True).strip()
     subprocess.run(args, check=True)
+
+
+def bundle_runtime(stage, cache, source_dir):
+    """Ship pinned MSYS2 DLLs, notices and their exact source packages."""
+    manifest = Path(__file__).with_name('windows-runtime.json')
+    packages = json.loads(manifest.read_text())
+    downloads = {}
+    for package in packages:
+        downloads[package['url']] = package['sha256']
+        downloads[package['source']] = package['sourceSha256']
+
+    def download(item):
+        url, expected = item
+        destination = cache / url.rsplit('/', 1)[1]
+        if not destination.exists():
+            temporary = destination.with_suffix('.download')
+            with urllib.request.urlopen(url, timeout=120) as response, temporary.open('wb') as stream:
+                shutil.copyfileobj(response, stream)
+            temporary.replace(destination)
+        with destination.open('rb') as stream:
+            actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+        if actual != expected:
+            raise RuntimeError(f'Runtime checksum mismatch: {destination.name}')
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(pool.map(download, downloads.items()))
+    for package in packages:
+        archive = cache / package['url'].rsplit('/', 1)[1]
+        # Both GNU tar (with zstd) and Windows 11's bsdtar support .tar.zst.
+        members = run('tar', '-tf', str(archive), capture=True).splitlines()
+        source = cache / package['source'].rsplit('/', 1)[1]
+        shutil.copyfile(source, source_dir / source.name)
+        for member in package['files']:
+            if member not in members:
+                raise RuntimeError(f'Missing runtime DLL: {member}')
+            data = subprocess.check_output(['tar', '-xOf', str(archive), member])
+            if data[:2] != b'MZ':
+                raise RuntimeError(f'Invalid Windows DLL: {member}')
+            (stage / Path(member).name).write_bytes(data)
+        for member in members:
+            if member.startswith('ucrt64/share/licenses/') and not member.endswith('/'):
+                target = stage / 'third-party' / 'runtime' / member.removeprefix('ucrt64/share/licenses/')
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(subprocess.check_output(['tar', '-xOf', str(archive), member]))
+    shutil.copyfile(manifest, stage / 'third-party' / 'windows-runtime.json')
+    common = stage / 'third-party' / 'common-licenses'
+    common.mkdir()
+    for name in ['GPL-2', 'GPL-3', 'LGPL-2.1', 'LGPL-3']:
+        shutil.copyfile(Path(__file__).with_name('licenses') / f'{name}.txt', common / f'{name}.txt')
 
 
 def cross_unrar(cache):
@@ -84,34 +132,33 @@ def main():
     output, cache = args.output.resolve(), args.cache.resolve()
     output.mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
-    archive = cache / 'libmpv-lgpl.zip'
-    if not archive.is_file():
-        temporary = archive.with_suffix('.download')
-        urllib.request.urlretrieve(RUNTIME_URL, temporary)
-        temporary.replace(archive)
-    if hashlib.sha256(archive.read_bytes()).hexdigest() != RUNTIME_SHA256:
-        raise RuntimeError('libmpv archive checksum mismatch')
     stage = output / 'DLDR'
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir()
     notices = stage / 'third-party'
-    with zipfile.ZipFile(archive) as package:
-        for source, target in [('libmpv-2.dll', stage / 'libmpv-2.dll'),
-                               ('LICENSE.LGPL', notices / 'mpv/LICENSE.LGPL')]:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(package.read(source))
+    notices.mkdir()
+    source_dir = output / 'runtime-sources'
+    if source_dir.exists():
+        shutil.rmtree(source_dir)
+    source_dir.mkdir()
+    bundle_runtime(stage, cache, source_dir)
     rust, javascript = collect_code_notices(notices, TARGET)
     for name, data in [('rust-packages.json', rust), ('javascript-packages.json', javascript)]:
         (notices / name).write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     shutil.copyfile(ROOT / 'docs/THIRD-PARTY.md', notices / 'THIRD-PARTY.md')
-    runtime = {'url': RUNTIME_URL, 'sha256': RUNTIME_SHA256, 'mpvRevision': '543a8c2c5',
-               'variant': 'first-party Windows x64 LGPL', 'replaceable': 'libmpv-2.dll beside the executable'}
-    (notices / 'windows-runtime.json').write_text(json.dumps(runtime, indent=2) + '\n')
+    runtime = {'distribution': 'MSYS2 UCRT64', 'manifest': 'third-party/windows-runtime.json',
+               'replaceable': 'DLLs beside the executable'}
+    shutil.copyfile(ROOT / 'LICENSE.md', stage / 'LICENSE.md')
+    shutil.copyfile(ROOT / 'docs/windows.md', stage / 'README.md')
     config = {'bundle': {'targets': ['nsis'], 'resources': {
-        str(stage / 'libmpv-2.dll'): 'libmpv-2.dll', str(stage / 'dldr.exe'): 'dldr.exe', str(notices): 'third-party'},
+        **{str(path): path.name for path in stage.glob('*.dll')},
+        str(stage / 'LICENSE.md'): 'LICENSE.md', str(stage / 'README.md'): 'README.md',
+        str(stage / 'dldr.exe'): 'dldr.exe', str(notices): 'third-party'},
         'windows': {'webviewInstallMode': {'type': 'downloadBootstrapper'},
                     'nsis': {'installMode': 'currentUser', 'displayLanguageSelector': True,
+                             'installerIcon': str(ROOT / 'apps/desktop/src-tauri/icons/icon.ico'),
+                             'uninstallerIcon': str(ROOT / 'apps/desktop/src-tauri/icons/icon.ico'),
                              'languages': ['TradChinese', 'SimpChinese', 'Japanese', 'English']}}}}
     native = sys.platform == 'win32'
     pnpm = shutil.which('pnpm.cmd' if native else 'pnpm')
@@ -147,7 +194,6 @@ def main():
     shutil.copyfile(ROOT / 'docs/windows.md', stage / 'README.md')
     info = {'version': version, 'target': TARGET, 'commit': run('git', 'rev-parse', 'HEAD', capture=True),
             'dirty': bool(run('git', 'status', '--porcelain', capture=True)), 'runtime': runtime,
-            'nativeWindowsAcceptance': 'pending', 'distribution': 'local test candidate',
             'rust': run('rustc', '--version', capture=True)}
     (stage / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n')
     zip_path = output / f'DLDR_{version}_windows_x64.zip'
@@ -163,21 +209,37 @@ def main():
                 names.add(name.casefold())
                 package.write(path, name)
     if not args.no_installer:
-        installers = list((binaries / 'bundle/nsis').glob('*setup.exe'))
+        installers = list((binaries / 'bundle/nsis').glob(f'*_{version}_x64-setup.exe'))
         if len(installers) != 1:
             raise RuntimeError(f'Expected one NSIS installer, found {installers}')
         shutil.copyfile(installers[0], output / f'DLDR_{version}_x64-setup.exe')
+    with zipfile.ZipFile(zip_path) as package:
+        if damaged := package.testzip():
+            raise RuntimeError(f'Corrupt portable ZIP member: {damaged}')
     # Current source files only: deleted historical files must not enter archives.
     files = run('git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', capture=True).split('\0')
     with tarfile.open(output / f'DLDR_{version}_windows-source.tar.gz', 'w:gz') as package:
         for name in sorted(set(files)):
             if name and Path(name).is_file():
                 package.add(name, arcname='dldr/' + name, recursive=False)
-    artifacts = [zip_path, output / f'DLDR_{version}_windows-source.tar.gz']
+    # Vendor the complete Rust graph, including native C/C++ crate sources.
+    with (source_dir / 'cargo-config.toml').open('w', encoding='utf-8') as config_file:
+        subprocess.run(['cargo', 'vendor', '--locked', '--offline', str(source_dir / 'rust')], stdout=config_file, check=True)
+    shutil.copyfile(Path(__file__).with_name('windows-runtime.json'), source_dir / 'windows-runtime.json')
+    (source_dir / 'README.txt').write_text(
+        'Exact MSYS2 source packages include upstream sources, patches and PKGBUILD build recipes.\n'
+        'Unpack each .src.tar.zst with tar and follow its PKGBUILD using MSYS2 UCRT64.\n'
+        'Rust sources are under rust/; update the directory in cargo-config.toml before reuse.\n'
+        'DLDR source and application build instructions accompany this archive.\n', encoding='utf-8')
+    runtime_source = output / f'DLDR_{version}_windows-runtime-sources.tar.gz'
+    with tarfile.open(runtime_source, 'w:gz', compresslevel=6) as package:
+        package.add(source_dir, arcname='runtime-sources')
+    shutil.rmtree(source_dir)
+    artifacts = [zip_path, output / f'DLDR_{version}_windows-source.tar.gz', runtime_source]
     if not args.no_installer:
         artifacts.append(output / f'DLDR_{version}_x64-setup.exe')
     (output / 'SHA256SUMS.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in artifacts))
-    print(f'Windows candidate: {zip_path}\nExecutable: {stage / "DLDR.Desktop.exe"}')
+    print(f'Windows release: {zip_path}\nExecutable: {stage / "DLDR.Desktop.exe"}')
 
 
 if __name__ == '__main__':

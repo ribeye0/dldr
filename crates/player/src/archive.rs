@@ -2,8 +2,10 @@
 //! streamed by mpv; only small VTT files are read here. Nothing is extracted.
 use crate::{Error, Result};
 use libloading::Library;
+#[cfg(not(windows))]
+use std::ffi::CString;
 use std::{
-    ffi::{c_char, c_int, c_void, CStr, CString},
+    ffi::{c_char, c_int, c_void, CStr},
     path::{Component, Path},
 };
 use zip::read::HasZipMetadata;
@@ -11,7 +13,10 @@ use zip::read::HasZipMetadata;
 type Handle = *mut c_void;
 type New = unsafe extern "C" fn() -> Handle;
 type Status = unsafe extern "C" fn(Handle) -> c_int;
+#[cfg(not(windows))]
 type Open = unsafe extern "C" fn(Handle, *const c_char, usize) -> c_int;
+#[cfg(windows)]
+type Open = unsafe extern "C" fn(Handle, *const u16, usize) -> c_int;
 type Next = unsafe extern "C" fn(Handle, *mut Handle) -> c_int;
 type Name = unsafe extern "C" fn(Handle) -> *const c_char;
 type FileType = unsafe extern "C" fn(Handle) -> u32;
@@ -47,7 +52,7 @@ impl Reader {
         #[cfg(target_os = "macos")]
         let names = ["libarchive.13.dylib", "libarchive.dylib"];
         #[cfg(target_os = "windows")]
-        let names = ["archive.dll", "libarchive.dll"];
+        let names = ["libarchive-13.dll", "archive.dll", "libarchive.dll"];
         #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
         let names = ["libarchive.so.13"];
         // Keep the ZIP filename contract used by downloads: explicit Unicode
@@ -103,7 +108,10 @@ impl Reader {
             }
             let new = symbol!("archive_read_new", New);
             let formats = symbol!("archive_read_support_format_all", Status);
+            #[cfg(not(windows))]
             let open = symbol!("archive_read_open_filename", Open);
+            #[cfg(windows)]
+            let open = symbol!("archive_read_open_filename_w", Open);
             let free = symbol!("archive_read_free", Status);
             let next = symbol!("archive_read_next_header", Next);
             let name = symbol!("archive_entry_pathname", Name);
@@ -111,8 +119,19 @@ impl Reader {
             let file_type = symbol!("archive_entry_filetype", FileType);
             let size = symbol!("archive_entry_size", Size);
             let read = symbol!("archive_read_data", Read);
+            #[cfg(not(windows))]
             let path = CString::new(path.to_str().ok_or(Error::InvalidPath)?)
                 .map_err(|_| Error::InvalidPath)?;
+            #[cfg(windows)]
+            let path = {
+                use std::os::windows::ffi::OsStrExt;
+                let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+                if wide.contains(&0) {
+                    return Err(Error::InvalidPath);
+                }
+                wide.push(0);
+                wide
+            };
             let handle = new();
             if handle.is_null() {
                 return Err(Error::Archive);

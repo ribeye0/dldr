@@ -43,7 +43,8 @@ logo.save(BRAND / 'dldr-logo.png', optimize=True)
 # The symbol ends above the large DLDR wordmark. Keep it square for native icons.
 symbol = Image.fromarray(rgba).crop((0, 0, source.width, 722))
 symbol = symbol.crop(symbol.getbbox())
-size = round(max(symbol.size) * 1.16)
+# Keep roughly 2% clear space per edge so small native icons remain legible.
+size = round(max(symbol.size) * 1.04)
 icon = Image.new('RGBA', (size, size))
 icon.alpha_composite(symbol, ((size - symbol.width) // 2, (size - symbol.height) // 2))
 icon.resize((1024, 1024), Image.Resampling.LANCZOS).save(BRAND / 'dldr-icon.png', optimize=True)

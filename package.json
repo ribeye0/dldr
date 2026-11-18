@@ -1,6 +1,6 @@
 {
   "name": "dldr",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0",
   "description": "DLDR \u2014 DLsite Downloader: a desktop library and download manager.",
   "type": "module",
   "scripts": {

@@ -35,7 +35,9 @@ impl LibraryInstanceGuard {
         }
         let file = options.open(data_dir.join("runtime.lock"))?;
         FileExt::try_lock_exclusive(&file).map_err(|error| {
-            if error.kind() == io::ErrorKind::WouldBlock {
+            if error.kind() == io::ErrorKind::WouldBlock
+                || error.raw_os_error() == fs2::lock_contended_error().raw_os_error()
+            {
                 io::Error::new(io::ErrorKind::WouldBlock,
                     "Another GUI or dldr command is using this library. Close it before logging in, syncing or downloading; search, show and status still work.")
             } else { error }

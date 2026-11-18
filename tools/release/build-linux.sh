@@ -64,16 +64,24 @@ cp docs/linux-install.md "$output/INSTALL.md"
 cat > "$output/RELEASE-NOTES.md" <<EOF
 # DLDR $version
 
-DLsite library, selective downloader and audio player for Linux x86_64.
+A desktop library, downloader and audio player for purchased DLsite works.
+
+## Downloads
 
 - GUI: DLDR_${version}_amd64.AppImage
 - CLI and optional user installer: dldr_${version}_linux_x86_64.tar.gz
-- Verify downloads with SHA256SUMS.txt; read INSTALL.md before installing.
+- Windows 11 x64 portable: DLDR_${version}_windows_x64.zip
+- Windows 11 x64 installer: DLDR_${version}_x64-setup.exe
+- Verify downloads with SHA256SUMS.txt; Linux users should read INSTALL.md.
 - Requires glibc 2.39+ (Ubuntu 24.04 baseline). Updates are manual.
+- Windows ZIP requires Microsoft Edge WebView2; the installer offers to install it.
+- Windows executables are unsigned; SmartScreen may show a warning.
 - Official DLsite Play is experimental; reader-only products are not guaranteed.
-- Source, dependency notices and corresponding runtime sources accompany this build.
+- Application source, dependency notices and corresponding runtime sources accompany both platforms.
 
-See the [project guide](https://github.com/ribeye0/dldr#readme) for features and usage.
+See [Linux installation](https://github.com/ribeye0/dldr/blob/main/docs/linux-install.md),
+[Windows usage](https://github.com/ribeye0/dldr/blob/main/docs/windows.md) and
+[CLI usage](https://github.com/ribeye0/dldr/blob/main/docs/dldr.md).
 EOF
 python3 - "$output" <<'PY'
 import json,os,platform,subprocess,sys
