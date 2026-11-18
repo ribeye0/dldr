@@ -44,8 +44,9 @@ WebKitGTK, GStreamer, libmpv and codec libraries. These components retain their
 individual licenses; **the complete AppImage is not exclusively MIT-licensed**.
 The selected Ubuntu libmpv/FFmpeg builds include GPL-licensed components.
 
-Each candidate is accompanied by a third-party notice archive and corresponding
-source archives. Inside an extracted AppImage, see `usr/share/doc/dldr/` for:
+License notices are included in each application package. Corresponding source
+archives are retained on the [Dependency sources](https://github.com/ribeye0/dldr/releases/tag/dependency-sources)
+archive page, linked from every release. Inside an extracted AppImage, see `usr/share/doc/dldr/` for:
 
 - `system-packages.json`: actual bundled binary and source package versions.
 - `bundled-files.json`: packaged paths and their distribution package owners.
@@ -58,7 +59,7 @@ original source and Debian/Ubuntu packaging files, plus vendored Rust sources.
 It also includes the pinned outer AppImage runtime source, its FUSE/squashfuse
 sources, patches and upstream rebuild instructions; static runtime component
 notices are under `bundler-licenses/`.
-The DLDR source archive includes the application and its build/repack scripts.
+The version tag in the DLDR repository contains the application and its build/repack scripts.
 Use the same-version sources and follow `docs/releasing.md` to rebuild.
 No upstream update feed or private signing key is needed for this manual-update
 release channel. SHA256 hashes identify the downloaded files; they do not replace
@@ -79,6 +80,7 @@ These builds include GPL-licensed components; **the complete Windows package is
 not exclusively MIT-licensed**. License notices accompany the binaries. The
 matching Windows runtime source archive contains each exact MSYS2 source package
 (upstream sources, patches and PKGBUILD recipes) and vendored Rust dependencies,
-including native C/C++ sources. The application source archive contains DLDR and
-its packaging scripts. Both source archives accompany every Windows release.
+including native C/C++ sources. The DLDR version tag contains the application and its packaging scripts.
+Corresponding runtime sources remain available on the separate dependency-source
+archive page; each application release links to it.
 User credentials and purchased media are never included.

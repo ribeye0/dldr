@@ -25,6 +25,7 @@ pnpm check
 pnpm test
 python3 tools/install/test-install-linux.py
 python3 tools/release/test-notices.py
+python3 tools/release/test-publish.py
 cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
@@ -55,29 +56,37 @@ application or runtime dependency changes. CI always performs the full build.
 
 ## Publish a release
 
-1. Update the workspace version in `Cargo.toml`, root and desktop `package.json`,
-   `Cargo.lock` and `apps/desktop/src-tauri/tauri.conf.json` to the same version.
-   Rust members inherit workspace metadata; do not duplicate their versions.
-2. Run the checks above, review the diff and commit to `main`.
-3. Create and push a matching `vVERSION` tag. Existing published tags are immutable.
-4. Check the release workflow in Actions. It validates versions and `main`
-   ancestry, builds/tests both platforms and uploads verified assets.
-   Stable tags publish a latest Release;
-   `-rc` tags remain draft prereleases.
+Normal CI checks the source. Packaging is a separate workflow and does not repeat
+all frontend/Rust tests. A release can also be created manually by uploading
+locally built and verified installers through GitHub's Releases page or `gh`.
 
-The build generates a short `RELEASE-NOTES.md` with artifact names, requirements
-and current limits. Review its contents before pushing the tag; release
-descriptions belong on
-GitHub rather than in dated development notes.
+1. Update the workspace, lockfile and desktop/frontend versions together.
+2. Check the changes and commit to `main`.
+3. Create and push `vVERSION`, or run **DLDR release** manually for an existing tag.
+4. The packaging workflow builds both platforms and verifies the packaged Linux UI.
+5. The publisher verifies artifact and file checksums and uploads exactly:
+   - `DLDR_VERSION_windows_x64.zip`
+   - `DLDR_VERSION_x64-setup.exe`
+   - `DLDR_VERSION_amd64.AppImage`
 
-The repository-scoped `GITHUB_TOKEN` is sufficient; no updater/signing key is
-needed. Workflow dispatch accepts an existing tag for retries. Re-runs may replace
-assets on drafts and refuse to overwrite published releases. The release job
-publishes stable versions only after both platform build/check jobs succeed.
+Release notes contain a short description, platform requirements and a source
+archive link. GitHub also adds its own repository source ZIP/tarball links.
+
+Corresponding dependency sources are kept on the separate
+[Dependency sources](https://github.com/ribeye0/dldr/releases/tag/dependency-sources)
+archive page. Versioned archive files are verified and retained. Licenses remain
+inside the application packages. Source availability is verified before the
+installers are published. Build metadata, test reports, standalone CLI builds and
+checksum manifests remain in Actions artifacts rather than the user-facing release.
+
+`tools/release/publish.py` streams artifacts through the REST API with bounded
+retries, verifies their SHA256 digests and manifests, and checks both platforms'
+embedded commit metadata. Only the publisher has repository write permissions.
+The workflow caches dependencies and downloaded source packages. Existing published
+versions are never overwritten; `-rc` tags remain draft prereleases.
 
 The desktop crate emits only its Rust library and executable. CI removes unused
-runner SDKs and validation build outputs before packaging to leave space for
-AppImage runtime sources. These cleanup steps apply only to disposable runners.
+runner SDKs before AppImage packaging. These cleanup steps apply only to runners.
 
 ## Before tagging a stable version
 

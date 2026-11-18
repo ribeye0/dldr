@@ -1,16 +1,16 @@
 # DLDR for Linux
 
-Download from **https://github.com/ribeye0/dldr/releases**. This first preview
-supports **x86_64 Linux with glibc 2.39 or newer**, built on Ubuntu 24.04.
-Windows, macOS, ARM64, Alpine/musl and Ubuntu 22.04 are not release targets yet.
+Download from **https://github.com/ribeye0/dldr/releases**. The AppImage supports **x86_64 Linux with glibc 2.39 or newer**, built on Ubuntu 24.04.
+macOS, ARM64, Alpine/musl and Ubuntu 22.04 are not supported by this AppImage.
+Windows 11 x64 packages are documented in [Windows usage](windows.md).
 Other desktop distributions must be tested; AppImage does not make every system
 library or graphics driver portable.
 
 ## Start the GUI
 
 ```sh
-chmod +x DLDR_0.1.0_amd64.AppImage
-./DLDR_0.1.0_amd64.AppImage
+chmod +x DLDR_0.1.1_amd64.AppImage
+./DLDR_0.1.1_amd64.AppImage
 ```
 
 The GUI does not need Node.js, pnpm or Rust. libmpv, libarchive and the media dependencies
@@ -18,7 +18,7 @@ are packaged for the local player and official WebView. The host still provides
 its desktop, graphics drivers and audio service. If FUSE is unavailable, try:
 
 ```sh
-./DLDR_0.1.0_amd64.AppImage --appimage-extract-and-run
+./DLDR_0.1.1_amd64.AppImage --appimage-extract-and-run
 ```
 
 Open Settings → Download settings to choose the library and temporary folders;
@@ -27,7 +27,10 @@ status opens download progress. Downloads never start merely by opening DLDR.
 
 ## CLI
 
-Extract `dldr_0.1.0_linux_x86_64.tar.gz` into its own folder. Either run
+The standalone CLI archive is a developer build artifact, not a regular release
+attachment. Build it with `bash tools/release/build-linux.sh` or build just the CLI
+with `cargo build --release -p dldr-cli`. If using the generated archive, extract
+`dldr_0.1.1_linux_x86_64.tar.gz` into its own folder. Either run
 `./dldr` there, or install the executable on your PATH:
 
 ```sh
@@ -46,7 +49,7 @@ status can coexist. See `dldr --help` and `docs/dldr.md` in the source archive.
 To launch an AppImage from the CLI:
 
 ```sh
-dldr gui /absolute/path/to/DLDR_0.1.0_amd64.AppImage
+dldr gui /absolute/path/to/DLDR_0.1.1_amd64.AppImage
 ```
 
 Alternatively set `DLDR_GUI` to an executable path. It is a path, not a shell
@@ -58,7 +61,7 @@ The CLI archive also contains `install-linux.py` and `icon.png`. Python 3 is
 needed only for this optional installer:
 
 ```sh
-python3 install-linux.py --appimage /path/to/DLDR_0.1.0_amd64.AppImage --cli ./dldr
+python3 install-linux.py --appimage /path/to/DLDR_0.1.1_amd64.AppImage --cli ./dldr
 ```
 
 It copies the program to `$XDG_DATA_HOME/dldr` (normally `~/.local/share/dldr`),
