@@ -170,7 +170,7 @@ def main():
         raise RuntimeError('Refusing to overwrite a published release')
     source_release = api(repo, '/releases/tags/' + SOURCE_TAG, missing_ok=True)
     if source_release is None:
-        gh('create', SOURCE_TAG, '--target', args.commit, '--title', 'Dependency sources', '--prerelease', '--latest=false',
+        gh('create', SOURCE_TAG, '--title', 'Dependency sources', '--prerelease', '--latest=false',
            '--notes', 'Corresponding third-party source archives for DLDR. Download the application from the numbered releases. Application source and build scripts are available through their version tags.')
         source_release = api(repo, '/releases/tags/' + SOURCE_TAG)
     available = {asset['name']: asset for asset in source_release['assets']}

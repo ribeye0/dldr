@@ -62,6 +62,7 @@ class PublishTests(unittest.TestCase):
 
         def gh(command, tag, *args):
             if command == 'create':
+                self.assertNotIn('--target', args)
                 releases[tag] = {'draft': '--draft' in args, 'assets': [], 'html_url': 'https://github.com/test/release'}
             elif command == 'upload':
                 for name in args:
