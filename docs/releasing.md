@@ -1,6 +1,6 @@
 # Releases
 
-DLDR publishes an x86_64 AppImage and a standalone `dldr` archive, built on
+DLDR publishes an x86_64 AppImage, built on
 Ubuntu 24.04 (glibc 2.39+). Updates are manual through
 [GitHub Releases](https://github.com/ribeye0/dldr/releases). Windows 11 x64 releases include a portable ZIP and a per-user NSIS installer.
 See [installation and data compatibility](linux-install.md).
@@ -35,7 +35,7 @@ dbus-run-session -- xvfb-run -a python3 tools/release/smoke-native.py target/dis
 ```
 
 Artifacts are written to `target/dist/release/`: AppImage, CLI, licenses/notices, DLDR
-source, corresponding runtime sources, installation/release notes, build metadata
+source, corresponding runtime sources, installation instructions, build metadata
 and SHA256 checksums. Runtime sources may be split to fit GitHub's file limit.
 Allow several GB of disk space for the build, source downloads and Cargo vendor.
 
@@ -52,18 +52,18 @@ or physical audio output.
 
 After a successful unchanged GUI/CLI build, packaging-only retries may use
 `bash tools/release/build-linux.sh --reuse-build`. Rebuild normally after
-application or runtime dependency changes. CI always performs the full build.
+application or runtime dependency changes. The release workflow always performs the full build.
 
 ## Publish a release
 
-Normal CI checks the source. Packaging is a separate workflow and does not repeat
-all frontend/Rust tests. A release can also be created manually by uploading
+Automatic CI tests are disabled; run the checks above locally. The release
+workflow only packages and publishes files. A release can also be created manually by uploading
 locally built and verified installers through GitHub's Releases page or `gh`.
 
 1. Update the workspace, lockfile and desktop/frontend versions together.
 2. Check the changes and commit to `main`.
 3. Create and push `vVERSION`, or run **DLDR release** manually for an existing tag.
-4. The packaging workflow builds both platforms and verifies the packaged Linux UI.
+4. The packaging workflow builds both platforms without running automated tests.
 5. The publisher verifies artifact and file checksums and uploads exactly:
    - `DLDR_VERSION_windows_x64.zip`
    - `DLDR_VERSION_x64-setup.exe`

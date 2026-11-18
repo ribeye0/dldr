@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -117,6 +118,9 @@ def main():
     if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-rc\.\d+)?', args.tag) or not re.fullmatch(r'[0-9a-f]{40}', args.commit):
         parser.error('Invalid tag or commit')
     os.environ['GH_REPO'] = repo
+    output = Path('target/dist').resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    os.chdir(tempfile.mkdtemp(prefix='publish-', dir=output))
     version = args.tag[1:]
     tag = api(repo, '/git/ref/tags/' + args.tag)['object']
     if tag['type'] == 'tag':

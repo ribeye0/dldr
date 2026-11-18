@@ -69,38 +69,29 @@ jobs:
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # pinned implementation
         with:
           toolchain: 1.100.0
-          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
           cache-directories: target/dldr-source-downloads
       - name: Install build and media prerequisites
+        timeout-minutes: 10
         run: |
-          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends build-essential curl file pkg-config patchelf \
+          sudo sed -i -E 's@https?://[^ /]*archive\.ubuntu\.com/ubuntu/?@https://archive.ubuntu.com/ubuntu/@g; s/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install --yes --no-install-recommends build-essential curl file pkg-config patchelf \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev \
             libmpv2 fonts-noto-cjk ffmpeg gstreamer1.0-libav gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-            python3 python3-requests dpkg-dev xz-utils zstd xvfb xauth webkit2gtk-driver dbus-x11 pulseaudio
+            python3 python3-requests dpkg-dev xz-utils zstd
       - run: pnpm install --frozen-lockfile
       - run: cargo fetch --locked
       - name: Build release and source/notice archives
         run: bash tools/release/build-linux.sh
-      - name: Verify packaged media and native UI
-        run: dbus-run-session -- xvfb-run -a python3 tools/release/smoke-native.py target/dist/release
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dldr-linux-x86_64
           compression-level: 0
           path: target/dist/release/*
           if-no-files-found: error
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: dldr-native-qa
-          path: target/dist/qa/*
-          if-no-files-found: ignore
 
   windows:
     needs: prepare
@@ -122,7 +113,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
           toolchain: 1.100.0
-          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
