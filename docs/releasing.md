@@ -24,6 +24,7 @@ python3 tools/release/validate.py
 pnpm check
 pnpm test
 python3 tools/install/test-install-linux.py
+python3 tools/release/test-notices.py
 cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace

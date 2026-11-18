@@ -3,13 +3,35 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
 
 def run(*args):
     return subprocess.check_output(args, text=True, encoding="utf-8").strip()
+
+
+def relocated_owners(path, candidates, build_ids):
+    """Match relocated ELF files without attributing unrelated namesakes."""
+    def identity(source):
+        if source not in build_ids:
+            result = subprocess.run(["readelf", "-n", str(source)], capture_output=True,
+                                    text=True, encoding="utf-8", check=False,
+                                    env=os.environ | {"LC_ALL": "C"})
+            match = re.search(r"Build ID:\s*([0-9a-fA-F]+)", result.stdout)
+            build_ids[source] = match[1].lower() if match else None
+        return build_ids[source]
+
+    if not candidates:
+        return set()
+    expected = identity(path)
+    if not expected:
+        return set()
+    return {package for source, packages in candidates.items()
+            if source.is_file() and identity(source) == expected for package in packages}
 
 
 def collect_code_notices(doc, target=None):
@@ -64,8 +86,9 @@ def collect(appdir, output):
         package = listing.name.removesuffix(".list")
         for line in listing.read_text(encoding="utf-8").splitlines():
             exact.setdefault(line, set()).add(package)
-            basenames.setdefault(Path(line).name, set()).add(package)
+            basenames.setdefault(Path(line).name, {}).setdefault(Path(line), set()).add(package)
     owners, files, unknown = set(), [], []
+    build_ids = {}
     # Capture only application payload, not the notices added below.
     for path in sorted(appdir.rglob("*")):
         if doc in path.parents or not path.is_file() or path.is_symlink():
@@ -75,7 +98,7 @@ def collect(appdir, output):
             elf = stream.read(4) == b"\x7fELF"
         packages = exact.get("/" + str(relative), set())
         if not packages and elf:
-            packages = basenames.get(path.name, set())
+            packages = relocated_owners(path, basenames.get(path.name, {}), build_ids)
         owners.update(packages)
         if elf and not packages and path.name not in ["dldr-desktop", "AppRun", "AppRun.wrapped"]:
             unknown.append(str(relative))

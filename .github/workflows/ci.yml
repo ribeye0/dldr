@@ -47,6 +47,7 @@ jobs:
           python3 tools/release/validate.py
           python3 tools/install/test-install-linux.py
           python3 tools/dev/test-sync-genres.py
+          python3 tools/release/test-notices.py
           bash -n tools/release/build-linux.sh
       - name: Check frontend
         run: |

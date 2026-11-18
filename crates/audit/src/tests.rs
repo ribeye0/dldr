@@ -59,6 +59,12 @@ fn secrets_are_absent_from_actual_files_and_export() {
     assert_eq!(recorded[0].details["errorDetails"]["httpStatus"], 503);
     for entry in fs::read_dir(dir.path().join("diagnostics").join(logger.run_id())).unwrap() {
         let path = entry.unwrap().path();
+        if path.file_name().is_some_and(|name| name == "active.lock") {
+            // Windows prevents reading a leased byte range. The lease contains
+            // no application data; verify that it remains empty instead.
+            assert_eq!(fs::metadata(path).unwrap().len(), 0);
+            continue;
+        }
         if path.extension().is_some() {
             assert!(!String::from_utf8_lossy(&fs::read(path).unwrap()).contains(private));
         }

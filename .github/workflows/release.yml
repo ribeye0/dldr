@@ -69,6 +69,8 @@ jobs:
           toolchain: 1.100.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
       - name: Install build and media prerequisites
         run: |
           sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
@@ -86,6 +88,7 @@ jobs:
           pnpm test
           python3 tools/install/test-install-linux.py
           python3 tools/dev/test-sync-genres.py
+          python3 tools/release/test-notices.py
           cargo fmt --all --check
           cargo clippy --locked --workspace --all-targets -- -D warnings
           cargo test --locked --workspace
@@ -98,6 +101,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dldr-linux-x86_64
+          compression-level: 0
           path: target/dist/release/*
           if-no-files-found: error
 
@@ -130,6 +134,8 @@ jobs:
           toolchain: 1.100.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
       - run: pnpm install --frozen-lockfile
       - run: cargo fetch --locked
       - name: Build portable ZIP, installer and sources
@@ -141,22 +147,23 @@ jobs:
         run: |
           cargo fmt --all --check
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo clippy --locked --release --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $env:PATH = "$PWD\target\dist\windows\DLDR;$env:PATH"
-          cargo test --locked --workspace
+          cargo test --locked --release --target x86_64-pc-windows-msvc --workspace
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo test --locked -p dldr-player native_codec_probe_and_missing_file_errors -- --ignored
+          cargo test --locked --release --target x86_64-pc-windows-msvc -p dldr-player native_codec_probe_and_missing_file_errors -- --ignored
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo test --locked -p dldr-player archive_ -- --ignored --test-threads=1
+          cargo test --locked --release --target x86_64-pc-windows-msvc -p dldr-player archive_ -- --ignored --test-threads=1
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo test --locked -p dldr-player native_playback_seek_subtitles_resume_and_group_eof -- --ignored
+          cargo test --locked --release --target x86_64-pc-windows-msvc -p dldr-player native_playback_seek_subtitles_resume_and_group_eof -- --ignored
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo test --locked -p dldr-player native_seek_recovers -- --ignored
+          cargo test --locked --release --target x86_64-pc-windows-msvc -p dldr-player native_seek_recovers -- --ignored
           exit $LASTEXITCODE
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dldr-windows-x86_64
+          compression-level: 0
           path: |
             target/dist/windows/*.zip
             target/dist/windows/*setup.exe
