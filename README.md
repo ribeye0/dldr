@@ -13,6 +13,7 @@ Search, download and play your purchased DLsite works.
 ## Features
 
 - A cover-based library with circle, voice actor, genre and release-date metadata.
+- Read the original DLsite product description directly in work details.
 - Batch downloads across pages, up to four parallel works, pause/resume and a shared speed limit.
 - Built-in audio player with automatic VTT matching and a synchronized script view. Play tracks directly from supported archives.
 - DLsite Play integration: listen online, then queue downloads from the official player.
@@ -57,7 +58,7 @@ Click **Sync** after buying new works. Account and preference settings are group
 | Download settings | Folders, parallel downloads, speed limit and archive handling. |
 | Accounts | DLsite account and login settings. |
 
-## Everyday use
+## Usage
 
 ### Browse and search
 
@@ -67,11 +68,11 @@ Enter a title, circle, voice actor or genre, then press **Enter** or **Search**.
 
 | Query | Meaning |
 | --- | --- |
-| `NTR` or `青梅竹馬` | Search text in cached metadata. |
+| `"Cuckoldry (Netorare)"` or `"Childhood Friend"` | Search text in cached metadata. |
 | `$circle:バイコーンの森$` | Match a circle name. |
 | `$va:小花衣こっこ$` | Match a voice actor. |
-| `$tag:ASMR$` | Include a genre. |
-| `$-tag:ASMR$` | Exclude a genre. |
+| `$tag:Childhood Friend$` | Include a genre. |
+| `$-tag:Cuckoldry (Netorare)$` | Exclude a genre. |
 
 Separate conditions with spaces; all must match. For example: `$va:小花衣こっこ$ $tag:ASMR$`. Genre names and aliases in all four languages are searchable.
 
@@ -151,5 +152,7 @@ pnpm tauri dev
 ```
 
 Source layout: [architecture](docs/architecture.md). Dependency notices and sources: [third-party details](docs/THIRD-PARTY.md).
+
+Thanks to [AcrylicShrimp/dlsite-manager](https://github.com/AcrylicShrimp/dlsite-manager) for sharing the approach to downloading DLsite works.
 
 [MIT](LICENSE.md)

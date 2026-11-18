@@ -13,6 +13,7 @@
 ## 特色
 
 - 以封面瀏覽作品，顯示社團、聲優、分類與販賣日。
+- 在作品詳細資訊內，直接查看 DLsite 商品頁的作品介紹。
 - 跨頁批次勾選，最多同時下載四部作品，支援暫停、續傳與整體限速。
 - 內建音訊播放器，自動配對 VTT 字幕，以台本顯示同步字幕；支援直接播放壓縮檔內的音軌。
 - 整合 DLsite Play，先線上聆聽，再從官方播放器加入下載佇列。
@@ -57,7 +58,7 @@ Windows 版本尚未簽署；免安裝版需要 WebView2，安裝版會在缺少
 | 下載設定 | 存放目錄、平行下載數、限速、壓縮檔處理方式。 |
 | 帳號 | DLsite 帳號與登入設定。 |
 
-## 日常操作
+## 操作方式
 
 ### 瀏覽與搜尋
 
@@ -151,5 +152,7 @@ pnpm tauri dev
 ```
 
 [專案結構](docs/architecture.md) · [第三方元件與原始碼](docs/THIRD-PARTY.md)
+
+感謝 [AcrylicShrimp/dlsite-manager](https://github.com/AcrylicShrimp/dlsite-manager) 提供下載 DLsite 作品的方法。
 
 [MIT](LICENSE.md)
