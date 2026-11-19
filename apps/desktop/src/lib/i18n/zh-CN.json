@@ -307,8 +307,8 @@
   "Work actions": "作品操作",
   "Open folder": "打开文件夹",
   "Download": "下载",
-  "Download archives only": "仅下载压缩包",
-  "Mark as downloaded": "标记为已下载",
+  "Download archives": "下载压缩包",
+  "Locate downloaded work": "定位已下载作品",
   "Delete download": "删除下载文件",
   "Download needs attention": "下载需要处理",
   "Tag": "标签",
@@ -421,8 +421,8 @@
   "Delete downloaded files for {0}?": "删除 {0} 的下载文件？",
   "This removes the local downloaded folder and any staging files. Cached ownership stays intact, so you can download it again later.": "将移除本地下载文件夹与临时文件。持有记录会保留，以后可以重新下载。",
   "Deleted download for {0}": "已删除 {0} 的下载文件",
-  "Choose local folder for {0}": "选择 {0} 的本地文件夹",
-  "Marked {0} as downloaded": "已将 {0} 标记为已下载",
+  "Locate downloaded work: {0}": "定位已下载作品：{0}",
+  "Linked local files for {0}": "已关联 {0} 的本地文件",
   "Cancellation requested for {0}": "已请求取消 {0}",
   "Cancellation requested": "已请求取消",
   "Failed to open {0}: {1}": "无法打开 {0}：{1}",
@@ -942,5 +942,7 @@
   "Choose another file": "选择其他文件",
   "Inspect package": "检查安装包",
   "Continue using DLDR": "继续使用 DLDR",
-  "Update downloaded. Open Settings → About & updates to install when ready.": "更新已下载完成，可到“设置 → 关于与更新”选择何时安装。"
+  "Update downloaded. Open Settings → About & updates to install when ready.": "更新已下载完成，可到“设置 → 关于与更新”选择何时安装。",
+  "Link this work to an existing local folder.": "选择已下载作品的本地文件夹，将文件关联至作品库。",
+  "Work links": "作品链接"
 }

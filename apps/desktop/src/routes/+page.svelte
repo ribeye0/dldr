@@ -777,13 +777,13 @@
     }
   }
 
-  async function markProductDownloaded(product: Product) {
+  async function locateDownloadedProduct(product: Product) {
     try {
       const fallbackRoot = settings.libraryRoot.trim() || (await settings.systemDownloadRoot());
       const selected = await native.chooseDirectory({
         canCreateDirectories: false,
         defaultPath: fallbackRoot || undefined,
-        title: $t("Choose local folder for {0}", product.workId),
+        title: $t("Locate downloaded work: {0}", product.workId),
       });
 
       if (!selected) {
@@ -794,7 +794,7 @@
         product.workId,
         selected,
       );
-      notifications.success($t("Marked {0} as downloaded", product.workId));
+      notifications.success($t("Linked local files for {0}", product.workId));
       setProductDownload(product.workId, download);
       await refreshLibraryAfterMutation();
     } catch (err) {
@@ -1289,8 +1289,8 @@
     onDownload={() => productDetail && runProductDownloadAction(productDetail)}
     onDownloadArchives={() =>
       productDetail && downloadProductArchivesOnly(productDetail)}
-    onMarkDownloaded={() =>
-      productDetail && markProductDownloaded(productDetail)}
+    onLocateDownloaded={() =>
+      productDetail && locateDownloadedProduct(productDetail)}
     onRedownload={() => productDetail && redownloadProduct(productDetail)}
     onDeleteDownload={() =>
       productDetail && deleteDownloadedProduct(productDetail)}

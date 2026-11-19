@@ -35,12 +35,16 @@ const downloadedDetail: ProductDetail = {
   earliestPurchasedAt: "2026-05-20T08:30:00Z",
   latestPurchasedAt: "2026-05-21T14:10:00Z",
   creditGroups: [
-    { kind: "voice", label: "Voice", names: ["Akari Example"] },
+    { kind: "voice", label: "Voice", names: ["Akari Example", "Yuki Example"] },
     { kind: "scenario", label: "Scenario", names: ["M. Hoshino"] },
     { kind: "illust", label: "Illustration", names: ["Studio K"] },
     { kind: "music", label: "Music", names: ["Night Signal"] },
   ],
-  tags: [],
+  tags: [
+    { class: "genre", name: "ASMR" },
+    { class: "genre", name: "Binaural" },
+    { class: "genre", name: "Whispering" },
+  ],
 
   download: {
     status: "downloaded",
@@ -91,7 +95,8 @@ const meta = {
   title: "Library/Product Detail Dialog",
   component: ProductDetailDialogStory,
   parameters: { layout: "fullscreen" },
-  args: { detail: downloadedDetail },
+  args: { detail: downloadedDetail, language: "en" },
+  argTypes: { language: { control: "select", options: ["en", "zh-TW", "zh-CN", "ja"] } },
 } satisfies Meta<typeof ProductDetailDialogStory>;
 
 export default meta;
@@ -116,4 +121,17 @@ export const FailedDownload: Story = {
       },
     },
   },
+};
+
+export const NotDownloaded: Story = {
+  args: {
+    detail: {
+      ...downloadedDetail,
+      download: { ...downloadedDetail.download, status: "notDownloaded", localPath: null },
+    },
+  },
+};
+
+export const TraditionalChinese: Story = {
+  args: { language: "zh-TW", detail: { ...downloadedDetail, title: "天文台的漫漫長夜 — 雙聲優環繞音聲作品" } },
 };

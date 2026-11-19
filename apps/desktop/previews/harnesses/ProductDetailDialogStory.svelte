@@ -1,9 +1,16 @@
 <script lang="ts">
+  import { get } from "svelte/store";
+  import { locale, type UiLocale } from "$lib/i18n";
   import ProductDetailDialog from "$lib/features/library/ProductDetailDialog.svelte";
   import ToastStack from "$lib/components/ui/ToastStack.svelte";
   import type { Toast, ProductCreditField, ProductDetail } from "$lib/model/types";
 
-  let { detail }: { detail: ProductDetail } = $props();
+  let { detail, language = "en" }: { detail: ProductDetail; language?: UiLocale } = $props();
+  $effect(() => {
+    const previous = get(locale);
+    locale.set(language);
+    return () => locale.set(previous);
+  });
 
   let lastAction = $state("Detail open");
   let toasts = $state<Toast[]>([]);
@@ -31,6 +38,12 @@
   onCopyWorkId={() => { lastAction = `Copy ${detail.workId}`; copied(lastAction); }}
   onCopyCredit={copyCredit}
   onOpenDlsite={() => (lastAction = `Open ${detail.workId} on DLsite`)}
+  onOpenPlayer={() => (lastAction = `Play ${detail.workId}`)}
+  onDownload={() => (lastAction = `Download or open ${detail.workId}`)}
+  onDownloadArchives={() => (lastAction = `Download archives for ${detail.workId}`)}
+  onLocateDownloaded={() => (lastAction = `Locate local folder for ${detail.workId}`)}
+  onRedownload={() => (lastAction = `Re-download ${detail.workId}`)}
+  onDeleteDownload={() => (lastAction = `Delete download for ${detail.workId}`)}
 
 />
 

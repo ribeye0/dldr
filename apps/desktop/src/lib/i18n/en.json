@@ -307,8 +307,8 @@
   "Work actions": "Work actions",
   "Open folder": "Open folder",
   "Download": "Download",
-  "Download archives only": "Download archives only",
-  "Mark as downloaded": "Mark as downloaded",
+  "Download archives": "Download archives",
+  "Locate downloaded work": "Locate downloaded work",
   "Delete download": "Delete download",
   "Download needs attention": "Download needs attention",
   "Tag": "Tag",
@@ -421,8 +421,8 @@
   "Delete downloaded files for {0}?": "Delete downloaded files for {0}?",
   "This removes the local downloaded folder and any staging files. Cached ownership stays intact, so you can download it again later.": "This removes the local downloaded folder and any staging files. Cached ownership stays intact, so you can download it again later.",
   "Deleted download for {0}": "Deleted download for {0}",
-  "Choose local folder for {0}": "Choose local folder for {0}",
-  "Marked {0} as downloaded": "Marked {0} as downloaded",
+  "Locate downloaded work: {0}": "Locate downloaded work: {0}",
+  "Linked local files for {0}": "Linked local files for {0}",
   "Cancellation requested for {0}": "Cancellation requested for {0}",
   "Cancellation requested": "Cancellation requested",
   "Failed to open {0}: {1}": "Failed to open {0}: {1}",
@@ -942,5 +942,7 @@
   "Choose another file": "Choose another file",
   "Inspect package": "Inspect package",
   "Continue using DLDR": "Continue using DLDR",
-  "Update downloaded. Open Settings → About & updates to install when ready.": "Update downloaded. Open Settings → About & updates to install when ready."
+  "Update downloaded. Open Settings → About & updates to install when ready.": "Update downloaded. Open Settings → About & updates to install when ready.",
+  "Link this work to an existing local folder.": "Link this work to an existing local folder.",
+  "Work links": "Work links"
 }

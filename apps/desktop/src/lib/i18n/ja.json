@@ -307,8 +307,8 @@
   "Work actions": "作品の操作",
   "Open folder": "フォルダーを開く",
   "Download": "ダウンロード",
-  "Download archives only": "アーカイブのみダウンロード",
-  "Mark as downloaded": "ダウンロード済みにする",
+  "Download archives": "アーカイブをダウンロード",
+  "Locate downloaded work": "ダウンロード済み作品を指定",
   "Delete download": "ダウンロードを削除",
   "Download needs attention": "ダウンロードに対応が必要です",
   "Tag": "タグ",
@@ -421,8 +421,8 @@
   "Delete downloaded files for {0}?": "{0} のダウンロード済みファイルを削除しますか？",
   "This removes the local downloaded folder and any staging files. Cached ownership stays intact, so you can download it again later.": "ローカルのダウンロードフォルダーと一時ファイルを削除します。所有情報は維持するため、後で再ダウンロードできます。",
   "Deleted download for {0}": "{0} のダウンロードを削除しました",
-  "Choose local folder for {0}": "{0} のローカルフォルダーを選択",
-  "Marked {0} as downloaded": "{0} をダウンロード済みにしました",
+  "Locate downloaded work: {0}": "ダウンロード済み作品を指定：{0}",
+  "Linked local files for {0}": "{0} のローカルファイルを関連付けました",
   "Cancellation requested for {0}": "{0} のキャンセルを要求しました",
   "Cancellation requested": "キャンセルを要求しました",
   "Failed to open {0}: {1}": "{0} を開けません：{1}",
@@ -942,5 +942,7 @@
   "Choose another file": "別のファイルを選択",
   "Inspect package": "パッケージを確認",
   "Continue using DLDR": "DLDR の使用を続ける",
-  "Update downloaded. Open Settings → About & updates to install when ready.": "更新のダウンロードが完了しました。「設定 → バージョン情報と更新」から、都合のよい時にインストールできます。"
+  "Update downloaded. Open Settings → About & updates to install when ready.": "更新のダウンロードが完了しました。「設定 → バージョン情報と更新」から、都合のよい時にインストールできます。",
+  "Link this work to an existing local folder.": "既存のローカルフォルダーを選択し、作品に関連付けます。",
+  "Work links": "作品リンク"
 }
