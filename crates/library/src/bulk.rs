@@ -1,4 +1,78 @@
-use super::*;
+use crate::download_progress;
+use crate::{
+    BulkDownloadCandidates, BulkWorkDownloadFailure, BulkWorkDownloadPreview,
+    BulkWorkDownloadPreviewFile, BulkWorkDownloadPreviewProgress, BulkWorkDownloadPreviewRequest,
+    BulkWorkDownloadPreviewWork, BulkWorkDownloadProgress, BulkWorkDownloadReport,
+    BulkWorkDownloadRequest, BulkWorkDownloadSuccess, CancellationToken, Library, LibraryError,
+    Result, WorkDownloadProgress, WorkDownloadProgressSink, WorkDownloadReport,
+    WorkDownloadRequest, WorkDownloadSource, DOWNLOAD_CANCELLATION_POLL_INTERVAL,
+    MAX_PARALLEL_WORK_DOWNLOADS,
+};
+use dldr_storage::{ProductListPage, ProductListQuery, Storage, WorkDownloadStatus};
+use futures_util::stream::FuturesUnordered;
+use futures_util::StreamExt;
+use serde_json::json;
+use std::collections::BTreeSet;
+
+pub(super) const BULK_DOWNLOAD_PAGE_LIMIT: u32 = 500;
+
+/// Holds one resolved name preference for the whole paginated selection.
+pub(super) struct BulkProductPages {
+    query: ProductListQuery,
+    exhausted: bool,
+}
+
+impl BulkProductPages {
+    pub(super) fn new(mut query: ProductListQuery) -> Self {
+        query.limit = BULK_DOWNLOAD_PAGE_LIMIT;
+        query.offset = 0;
+        Self {
+            query,
+            exhausted: false,
+        }
+    }
+
+    pub(super) async fn next(&mut self, storage: &Storage) -> Result<Option<ProductListPage>> {
+        if self.exhausted {
+            return Ok(None);
+        }
+        let page = storage.list_products(&self.query).await?;
+        self.exhausted = page.products.len() < self.query.limit as usize;
+        self.query.offset = self.query.offset.saturating_add(page.products.len() as u32);
+        Ok(Some(page))
+    }
+}
+
+enum BulkDownloadSource<'a, S> {
+    Borrowed(&'a S),
+    Owned(S),
+}
+
+pub(super) struct BulkWorkDownloadSelection {
+    total_count: u64,
+    skipped_downloaded_count: usize,
+    pub(super) items: Vec<BulkWorkDownloadSelectionItem>,
+}
+
+pub(super) struct BulkWorkDownloadSelectionItem {
+    pub(super) work_id: String,
+    title: String,
+    content_size_bytes: Option<u64>,
+}
+
+struct BulkWorkProgressForwarder<'a, 'b> {
+    request: &'a BulkWorkDownloadRequest<'b>,
+    work_id: &'a str,
+}
+
+impl WorkDownloadProgressSink for BulkWorkProgressForwarder<'_, '_> {
+    fn emit(&self, progress: WorkDownloadProgress) {
+        self.request.emit(BulkWorkDownloadProgress::WorkProgress {
+            work_id: self.work_id.to_owned(),
+            progress,
+        });
+    }
+}
 
 impl Library {
     pub async fn select_bulk_candidates(
@@ -51,7 +125,7 @@ impl Library {
         .await
     }
 
-    pub(super) async fn download_products_using<'s, S, F>(
+    async fn download_products_using<'s, S, F>(
         &self,
         request: BulkWorkDownloadRequest<'_>,
         max_concurrent_works: usize,
@@ -216,7 +290,7 @@ impl Library {
         Ok(report)
     }
 
-    pub(super) async fn download_bulk_item<'s, S, F>(
+    async fn download_bulk_item<'s, S, F>(
         &self,
         request: &BulkWorkDownloadRequest<'_>,
         item: BulkWorkDownloadSelectionItem,

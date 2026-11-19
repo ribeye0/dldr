@@ -1,11 +1,7 @@
 import type { ProductListRequest } from "$lib/api/tauri";
 import type { ProductListPage, ProductFilterFacets } from "$lib/model/types";
 
-export class RequestGeneration {
-  private generation = 0;
-  invalidate() { return ++this.generation; }
-  current(generation: number) { return generation === this.generation; }
-}
+import { RequestGeneration } from "$lib/utils/request-generation";
 
 type QueryPort = {
   listProducts(request: ProductListRequest): Promise<ProductListPage>;

@@ -4,9 +4,7 @@ use crate::{
     Cli, Context, Error, Result,
 };
 use dldr_api::DlsiteClient;
-use dldr_library::{
-    CancellationToken, DlsiteSyncSource, SaveAccountRequest, TwoFactorPromptResponse,
-};
+use dldr_library::{CancellationToken, DlsiteSource, SaveAccountRequest, TwoFactorPromptResponse};
 use dldr_storage::{Account, AppSettingsPatch};
 use serde_json::json;
 use std::io::IsTerminal;
@@ -121,7 +119,7 @@ pub async fn login(
         remember_password: true,
         enabled: true,
     };
-    let source = DlsiteSyncSource::new(
+    let source = DlsiteSource::new(
         DlsiteClient::new(Default::default())
             .map_err(|_| Error::new("Could not initialize the DLsite client."))?,
     );

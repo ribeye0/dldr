@@ -26,7 +26,6 @@
     bind:label
     bind:loginName
     bind:password
-    onReset={() => (lastAction = "New account")}
     onSave={(event) => { event.preventDefault(); lastAction = `Submit ${label}`; }}
   />
   <p aria-live="polite">{lastAction}</p>

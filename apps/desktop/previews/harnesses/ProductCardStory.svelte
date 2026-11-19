@@ -1,22 +1,16 @@
 <script lang="ts">
   import { runningDownloadJob } from "../fixtures/jobs";
   import ProductCard from "$lib/features/library/ProductCard.svelte";
-  import type { Product, ProductCreditField } from "$lib/model/types";
+  import type { Product } from "$lib/model/types";
 
   let {
     product,
-    downloadLabel = "Download",
-    downloadTitle = "Download this work",
     downloadDisabled = false,
     detailLoading = false,
-    menuOpen = false,
   }: {
     product: Product;
-    downloadLabel?: string;
-    downloadTitle?: string;
     downloadDisabled?: boolean;
     detailLoading?: boolean;
-    menuOpen?: boolean;
   } = $props();
 
   let lastAction = $state("No action yet");
@@ -25,9 +19,7 @@
     lastAction = label;
   }
 
-  function copyCredit(field: ProductCreditField, workId: string) {
-    action(`Copy ${field.label} for ${workId}`);
-  }
+
 </script>
 
 <main class="story-surface">

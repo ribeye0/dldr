@@ -1,4 +1,10 @@
-use super::*;
+use crate::{now_string, CancellationToken, Library, LibraryError, Result, SaveAccountRequest};
+use async_trait::async_trait;
+use dldr_api::{ApiError, Credentials, LoginOutcome, SessionSnapshot, TwoFactorChallenge};
+use dldr_credentials::{CredentialRef, CredentialsError};
+use dldr_storage::{Account, AccountUpsert};
+use std::{sync::Arc, time::Duration};
+use uuid::Uuid;
 
 const MAX_TWO_FACTOR_ATTEMPTS: u32 = 3;
 
@@ -156,6 +162,29 @@ impl Library {
     where
         S: DlsiteAuthSource + Sync,
     {
+        self.authenticate_account_session(
+            account,
+            password,
+            two_factor_prompt,
+            cancellation_token,
+            source,
+            false,
+        )
+        .await
+    }
+
+    pub(super) async fn authenticate_account_session<S>(
+        &self,
+        account: &Account,
+        password: Option<&str>,
+        two_factor_prompt: Option<&dyn TwoFactorPrompt>,
+        cancellation_token: Option<&CancellationToken>,
+        source: &S,
+        refresh: bool,
+    ) -> Result<()>
+    where
+        S: DlsiteAuthSource + Sync,
+    {
         if cancellation_token.is_some_and(CancellationToken::is_cancelled) {
             return Err(LibraryError::Cancelled);
         }
@@ -168,7 +197,7 @@ impl Library {
         }
         let session_ref = CredentialRef::account_session(&account.id)?;
 
-        if account.credential_ref.is_none() {
+        if refresh || account.credential_ref.is_none() {
             self.credentials.delete_password(&session_ref)?;
         }
         if self

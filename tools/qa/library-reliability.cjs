@@ -77,7 +77,11 @@ async function installProbe(page) {
   await page.evaluate(()=>window.__reliabilityQa.failRestore=true);await page.getByRole('button',{name:'Import backup',exact:true}).click();await page.getByRole('button',{name:'Confirm import',exact:true}).click();await page.getByRole('alert').filter({hasText:'Invalid backup'}).waitFor();
   await page.screenshot({path:path.join(captures,'maintenance.png')});
   await page.getByRole('button',{name:'About & updates',exact:true}).click();
-  assert.equal(await page.getByRole('button',{name:'Check for Updates',exact:true}).count(),0);await page.getByText(/Upstream binary updates are disabled/).waitFor();
+  await page.getByRole('button',{name:/^Check for updates$/i}).click();
+  const updateDialog=page.getByRole('dialog',{name:'Update DLDR',exact:true});await updateDialog.waitFor();
+  await updateDialog.getByText('DLDR is up to date.',{exact:true}).waitFor();
+  assert.equal((await page.evaluate(()=>window.__reliabilityQa.requests)).filter(r=>r.command==='install_app_update').length,0);
+  await updateDialog.getByRole('button',{name:'Close',exact:true}).click();
   await page.setViewportSize({width:390,height:844});await page.locator('.download-status').click();await queue.waitFor();await queue.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(captures,'queue-narrow.png')});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
   assert.deepEqual(errors,[]);console.log(`Library reliability QA passed: ${captures}`);

@@ -111,6 +111,7 @@ pub(crate) fn describe(event: &mut AuditEvent) {
             .or_else(|| field(&event.details, "archiveErrorKind"))
             .or_else(|| field(&event.details, "apiErrorKind"))
             .or_else(|| field(&event.details, "ioKind"))
+            .or_else(|| field(&event.details, "downloadErrorKind"))
             .or(reason)
             .or_else(|| field(&event.details, "failureKind"));
         let (cause, hint) = failure_description(kind, &event.details);
@@ -226,6 +227,10 @@ fn failure_description(kind: Option<&str>, details: &Value) -> (&'static str, &'
         "credentials" | "missing_password" | "invalid_credentials" | "not_authorized" => (
             "The saved account could not be used to sign in.",
             "Check the account name and password in Settings, then synchronize again.",
+        ),
+        "invalid_response" => (
+            "DLsite returned an HTML page instead of a downloadable file.",
+            "Sign in again in Settings and retry. If this persists, check whether this work downloads from the DLsite website and export diagnostics.",
         ),
         "download_target_exists" | "target_exists" => (
             "The download destination already exists.",

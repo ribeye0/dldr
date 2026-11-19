@@ -1,4 +1,22 @@
-use super::*;
+use crate::models::{
+    ProductDetail, ProductFilterFacets, ProductListItem, ProductListPage, ProductListQuery,
+    ProductMakerFacet, ProductNameFacet, ProductOwner,
+};
+use crate::names::push_valid_name_map;
+use crate::names::{preferred_name, product_query};
+use crate::product_metadata::{
+    cached_work_needs_local_metadata_hydration, local_product_owner,
+    product_content_size_from_raw_json, product_credit_groups_from_raw_json,
+    product_tags_from_raw_json, product_text_values_from_json,
+};
+use crate::product_query::{
+    push_outer_product_sort, push_product_filters, push_product_filters_internal,
+    push_product_sort, push_product_visibility_filter,
+};
+use crate::rows::{ensure_changed, work_download_state_from_product_row};
+use crate::{LanguagePriority, Result, Storage, StorageError, MISSING_WORK_DETAIL_STATUS};
+use sqlx::{QueryBuilder, Row, Sqlite};
+use std::{collections::BTreeMap, collections::BTreeSet};
 
 impl Storage {
     pub async fn list_products(&self, query: &ProductListQuery) -> Result<ProductListPage> {
@@ -413,5 +431,68 @@ impl Storage {
         }
 
         Ok(products)
+    }
+}
+
+impl Storage {
+    pub async fn work_needs_local_metadata_hydration(&self, work_id: &str) -> Result<bool> {
+        let row = sqlx::query(
+            "SELECT title_json, maker_json, raw_json
+             FROM works
+             WHERE work_id = ?1",
+        )
+        .bind(work_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let Some(row) = row else {
+            return Ok(true);
+        };
+
+        let title_json: String = row.try_get("title_json")?;
+        let maker_json: Option<String> = row.try_get("maker_json")?;
+        let title = preferred_name(Some(&title_json)).unwrap_or_else(|| work_id.to_owned());
+        let maker_name = preferred_name(maker_json.as_deref());
+        let raw_json: String = row.try_get("raw_json")?;
+
+        Ok(cached_work_needs_local_metadata_hydration(
+            work_id,
+            &title,
+            maker_name.as_deref(),
+            &raw_json,
+        ))
+    }
+
+    pub async fn product_credits_checked_at(&self, work_id: &str) -> Result<Option<String>> {
+        Ok(sqlx::query_scalar::<_, Option<String>>(
+            "SELECT CASE WHEN json_valid(raw_json)
+                THEN CASE WHEN json_extract(raw_json, '$.public_credits_version') = 2
+                    THEN json_extract(raw_json, '$.public_credits_checked_at') END
+                END FROM works WHERE work_id = ?1",
+        )
+        .bind(work_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .flatten())
+    }
+
+    /// Supplement credits only; never replace purchase metadata or download state.
+    pub async fn cache_public_product_credits(
+        &self,
+        work_id: &str,
+        tags: &[serde_json::Value],
+        checked_at: &str,
+    ) -> Result<()> {
+        let result = sqlx::query(
+            "UPDATE works SET raw_json = json_set(raw_json,
+                '$.public_credit_tags', json(?2), '$.public_credits_checked_at', ?3, '$.public_credits_version', 2)
+             WHERE work_id = ?1 AND json_valid(raw_json)",
+        )
+        .bind(work_id)
+        .bind(serde_json::to_string(tags).expect("JSON tags serialize"))
+        .bind(checked_at)
+        .execute(&self.pool)
+        .await?;
+        ensure_changed(result, "product metadata", work_id)
     }
 }

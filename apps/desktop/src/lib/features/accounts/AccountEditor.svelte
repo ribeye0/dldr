@@ -11,7 +11,6 @@
     label = $bindable(""),
     loginName = $bindable(""),
     password = $bindable(""),
-    onReset,
     onSave,
   }: {
     editing?: boolean;
@@ -19,7 +18,6 @@
     label?: string;
     loginName?: string;
     password?: string;
-    onReset: () => void;
     onSave: (event: SubmitEvent) => void;
   } = $props();
 </script>

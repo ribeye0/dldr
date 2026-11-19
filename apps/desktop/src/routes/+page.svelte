@@ -1,6 +1,10 @@
 <script lang="ts">
-  import { t, locale, normalizeLocale, type UiLocale } from "$lib/i18n";
+  import { t, locale } from "$lib/i18n";
   import { onDestroy, onMount, untrack } from "svelte";
+  import { AccountsController } from "$lib/controllers/accounts-controller.svelte";
+  import { SettingsController } from "$lib/controllers/settings-controller.svelte";
+  import { DecisionController, NotificationController } from "$lib/controllers/feedback-controller.svelte";
+  import { RequestGeneration } from "$lib/utils/request-generation";
   import { initializeTheme } from "$lib/theme";
   import { appendSearchToken, parseProductSearch } from "$lib/utils/product-search";
   import { downloadMetrics, updateDownloadSession } from "$lib/utils/download-progress";
@@ -18,10 +22,7 @@
   import TwoFactorDialog from "$lib/features/accounts/TwoFactorDialog.svelte";
   import { JobController } from "$lib/controllers/job-controller.svelte";
   import { CreditHydrationController } from "$lib/controllers/credit-hydration-controller";
-  import {
-    LibraryQueryController,
-    RequestGeneration,
-  } from "$lib/controllers/library-query-controller";
+  import { GalleryController } from "$lib/controllers/gallery-controller.svelte";
   import { TwoFactorController } from "$lib/controllers/two-factor-controller.svelte";
   import AccountsView from "$lib/features/accounts/AccountsView.svelte";
   import FirstRunSetup from "$lib/features/accounts/FirstRunSetup.svelte";
@@ -38,6 +39,8 @@
   import PlaylistMenu from "$lib/features/player/PlaylistMenu.svelte";
   import { PlaylistController } from "$lib/controllers/playlist-controller.svelte";
   import SelectedWorksDialog from "$lib/features/library/SelectedWorksDialog.svelte";
+  import DownloadedWorksDialog from "$lib/features/library/DownloadedWorksDialog.svelte";
+  import { runLocalWorkBatch, type LocalWorkOperation, type LocalWorkProgress } from "$lib/utils/local-work-batch";
   import {
     SELECTION_STORAGE_KEY, addProducts, restoreSelection,
     selectedDownloadRequest, toggleProductSelection, selectedProduct, selectionSizeLabel,
@@ -48,19 +51,11 @@
   import UpdateDialog from "$lib/features/settings/UpdateDialog.svelte";
   import { UpdateController } from "$lib/controllers/update-controller.svelte";
   import {
-    DEFAULT_LANGUAGE_PRIORITY,
-    PRODUCT_PAGE_SIZE,
     DLSITE_URL,
     GITHUB_URL,
   } from "$lib/model/constants";
   import {
-    buildLanguagePriority,
-    defaultLanguagePriority,
-    sameLanguagePriority,
-  } from "$lib/utils/name-language-priority";
-  import {
     errorMessage,
-    formatBytes,
     shortDate,
     valueOrNull,
   } from "$lib/utils/format";
@@ -76,10 +71,9 @@
     jobWorkId,
     metadataNumber,
   } from "$lib/utils/jobs";
-  import { ageTooltip, creditTextForKind, dlsiteProductPageUrl } from "$lib/utils/products";
+  import { dlsiteProductPageUrl } from "$lib/utils/products";
   import type {
     Account,
-    AppInfo,
     AuditEvent,
     BulkDownloadDialog,
     BulkWorkDownloadPreview,
@@ -91,11 +85,8 @@
     ProductCreditField,
     ProductDetail,
     ProductDownload,
-    ProductFilterFacets,
     ProductImagePreview,
     StartWorkDownloadOptions,
-    Toast,
-    ToastKind,
     View,
   } from "$lib/model/types";
 
@@ -103,10 +94,19 @@
     void native.setNativeHeaderTheme(dark).catch(error => console.warn("Native titlebar appearance:", error));
   }));
 
+  const notifications = new NotificationController();
+  const confirmations = new DecisionController<ConfirmationDialog>();
+  const bulkConfirmation = new DecisionController<BulkDownloadDialog>();
+  const settings = new SettingsController(notifications, () => refreshLibraryAfterMutation(true));
+  const accountState = new AccountsController(
+    notifications, confirmations.show,
+    resetPage => gallery.load({ resetPage, clampInvalidPage: true }),
+  );
+
   const player = new PlayerController();
   const playlists = new PlaylistController();
   let playlistMenu = $state<{work:Product;point:{x:number;y:number;trigger:HTMLButtonElement}}|null>(null);
-  onMount(() => {void playlists.load().catch(cause=>notifyError(errorMessage(cause)));});
+  onMount(() => {void playlists.load().catch(cause=>notifications.error(errorMessage(cause)));});
   function choosePlaylist(work:Product,point:{x:number;y:number;trigger:HTMLButtonElement}) {playlistMenu={work,point};}
   async function togglePlaylist(work:Product,id="0") {
     const removing = playlists.lists.find(list=>list.id===id)?.workIds.includes(work.workId) ?? false;
@@ -114,15 +114,15 @@
       const updated = await playlists.edit({action:removing ? "remove" : "add",playlistId:id,workId:work.workId});
       if (updated) {
         const list=playlists.lists.find(list=>list.id===id);
-        notifySuccess($t(removing ? "Removed {0} from {1}" : "Added {0} to {1}",work.workId,list?.name || $t("Playlist {0}",0)));
+        notifications.success($t(removing ? "Removed {0} from {1}" : "Added {0} to {1}",work.workId,list?.name || $t("Playlist {0}",0)));
         playlistMenu=null;
       }
-    } catch(cause) {notifyError(errorMessage(cause));}
+    } catch(cause) {notifications.error(errorMessage(cause));}
   }
   onMount(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
-    void player.start().then(stop => { if (disposed) stop(); else unlisten = stop; }).catch(cause => notifyError(errorMessage(cause)));
+    void player.start().then(stop => { if (disposed) stop(); else unlisten = stop; }).catch(cause => notifications.error(errorMessage(cause)));
     return () => { disposed = true; player.dispose(); unlisten?.(); };
   });
   function openPlayer(work: Product | ProductDetail) {
@@ -131,20 +131,14 @@
     void player.open(work);
   }
 
-  type ProductLoadOptions = {
-    resetPage?: boolean;
-    clampInvalidPage?: boolean;
-    background?: boolean;
-  };
-
   let playLaunch = $state<{workId:string|null; accounts:Account[]} | null>(null);
   let playAccountId = $state("");
   let playOpening = $state(false);
   let playError = $state("");
   function requestOnlinePlay(product?: Product) {
-    const available = accounts.filter(account => account.enabled && (!product || product.owners.some(owner => owner.accountId === account.id)));
+    const available = accountState.accounts.filter(account => account.enabled && (!product || product.owners.some(owner => owner.accountId === account.id)));
     if (!available.length) {
-      notifyError($t("Add or enable a matching account in Settings before opening DLsite Play."));
+      notifications.error($t("Add or enable a matching account in Settings before opening DLsite Play."));
       return;
     }
     playError = "";
@@ -180,58 +174,19 @@
     navigate("settings");
   }
 
-  let autoExtract = $state(true);
-  let savedAutoExtract = $state(true);
-  const downloadUnpackPolicy = $derived(savedAutoExtract ? "unpackWhenRecognized" as const : "keepArchives" as const);
-  let libraryRoot = $state("");
   let setupOpen = $state(false);
-  let configuredDownloadRoot = $state<string | null>(null);
-  let downloadRoot = $state("");
-  let settingsLoading = $state(true);
-  let settingsSaving = $state(false);
-  let draftLanguagePriority = $state([...DEFAULT_LANGUAGE_PRIORITY]);
-  let savedLanguagePriority = $state([...DEFAULT_LANGUAGE_PRIORITY]);
-  let titleLanguageFollowsUi = $state(true);
-  let appInfo = $state<AppInfo | null>(null);
-  let appInfoLoading = $state(true);
   const appUpdate = new UpdateController();
   onDestroy(() => appUpdate.dispose());
 
-  let accounts = $state<Account[]>([]);
-  let accountsLoading = $state(true);
-  let accountSaving = $state(false);
-  let editingAccountId = $state<string | null>(null);
-  let accountLabel = $state("");
-  let accountLoginName = $state("");
-  let accountPassword = $state("");
-
-  let products = $state<Product[]>([]);
   let creditLoadingWorkIds = $state<string[]>([]);
-  let totalProducts = $state(0);
-  let productsLoading = $state(true);
-  let productPageIndex = $state(0);
   let bulkDownloadPlanning = $state(false);
   let selectedProducts = $state<SelectedProduct[]>([]);
+  let downloadedSelection = $state<SelectedProduct[]>([]);
+  const currentSelection = $derived(activeView === "downloaded" ? downloadedSelection : selectedProducts);
+  let localWorkBusy = $state(false);
+  let localWorkProgress = $state<LocalWorkProgress | null>(null);
   let selectionReviewOpen = $state(false);
   let selectionAnchorId: string | null = null;
-  let metadataFilters = $state<commands.MetadataFilters>({ genreNames: [], excludedGenreNames: [], voiceNames: [], excludedVoiceNames: [] });
-  let productSearch = $state("");
-  let selectedProductTypes = $state<string[]>([]);
-  let selectedAgeCategories = $state<string[]>([]);
-  let selectedProductSources = $state<string[]>([]);
-  let selectedMakerKeys = $state<string[]>([]);
-  let productFilterFacets = $state<ProductFilterFacets>({
-    makers: [],
-
-  });
-  let productSort = $state("latestPurchaseDesc");
-  let libraryFiltersOpen = $state(false);
-  let galleryScope = $state<"library" | "downloaded">("library");
-  const galleryQueries: Partial<Record<"library" | "downloaded", {
-    request: commands.ProductListRequest;
-    filtersOpen: boolean;
-  }>> = {};
-
   const jobController = new JobController();
   let downloadSessionIds = $state<string[]>([]);
   $effect(() => {
@@ -244,46 +199,34 @@
   let auditLoading = $state(true);
   let auditLogDir = $state("");
   let activityTarget = $state<DiagnosticTarget | null>(null);
-  let toasts = $state<Toast[]>([]);
   let productImagePreview = $state<ProductImagePreview | null>(null);
   let productDetail = $state<ProductDetail | null>(null);
   let productDetailLoadingWorkId = $state<string | null>(null);
-  let bulkDownloadDialog = $state<BulkDownloadDialog | null>(null);
   let batchConcurrency = $state(DEFAULT_DOWNLOAD_CONCURRENCY);
-  let confirmationDialog = $state<ConfirmationDialog | null>(null);
   const twoFactor = new TwoFactorController((error) =>
-    notifyError(errorMessage(error)),
+    notifications.error(errorMessage(error)),
   );
   const detailGeneration = new RequestGeneration();
-  const settingsGeneration = new RequestGeneration();
   const auditGeneration = new RequestGeneration();
   const creditHydration = new CreditHydrationController(commands, {
     updated: applyProductCredits,
     pending: (ids) => { creditLoadingWorkIds = ids; },
   });
-  const libraryQuery = new LibraryQueryController(commands, {
-    loading: (value) => {
-      productsLoading = value;
-    },
-    page: (page, index) => {
-      products = page.products;
-      totalProducts = page.totalCount;
-      productPageIndex = index;
+  const gallery = new GalleryController({
+    beforeLoad: () => creditHydration.clearQueue(),
+    page: (page) => {
       const current = new Map(page.products.map((product) => [product.workId, product]));
       const refreshed = selectedProducts.map((product) => current.has(product.workId) ? selectedProduct(current.get(product.workId)!) : product);
       if (JSON.stringify(refreshed) !== JSON.stringify(selectedProducts)) updateSelection(refreshed);
+      downloadedSelection = downloadedSelection.flatMap((item) => {
+        const product = current.get(item.workId);
+        if (!product) return [item];
+        return product.download.status === "downloaded" ? [selectedProduct(product)] : [];
+      });
       creditHydration.show(page.products);
     },
-    facets: (value) => {
-      productFilterFacets = value;
-    },
-    error: (error) => notifyError(errorMessage(error)),
+    error: error => notifications.error(errorMessage(error)),
   });
-
-  let toastSequence = 0;
-  let bulkDownloadDialogResolve: ((confirmed: boolean) => void) | null = null;
-  let confirmationDialogResolve: ((confirmed: boolean) => void) | null = null;
-  const toastTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   onMount(() => {
     try {
@@ -292,7 +235,7 @@
     try {
       selectedProducts = restoreSelection(localStorage.getItem(SELECTION_STORAGE_KEY));
     } catch {
-      notifyError($t("Could not restore saved selections. Your library is unchanged."));
+      notifications.error($t("Could not restore saved selections. Your library is unchanged."));
     }
     void loadInitial();
 
@@ -306,7 +249,7 @@
         } else {
           unlisteners.push(cleanup);
         }
-      });
+      }).catch(error => { if (!disposed) notifications.error(errorMessage(error)); });
     };
 
     register(jobController.listen(handleJobEvent));
@@ -333,300 +276,45 @@
 
   onDestroy(() => {
     creditHydration.dispose();
-    settingsGeneration.invalidate();
     auditGeneration.invalidate();
-    for (const timer of toastTimers.values()) {
-      clearTimeout(timer);
-    }
-    toastTimers.clear();
-
-    if (bulkDownloadDialogResolve) {
-      bulkDownloadDialogResolve(false);
-      bulkDownloadDialogResolve = null;
-    }
-
-    if (confirmationDialogResolve) {
-      confirmationDialogResolve(false);
-      confirmationDialogResolve = null;
-    }
+    gallery.dispose();
+    jobController.dispose();
+    settings.dispose();
+    accountState.dispose();
+    notifications.dispose();
+    confirmations.dispose();
+    bulkConfirmation.dispose();
   });
 
   async function loadInitial() {
     const [settingsReady, , accountsReady] = await Promise.all([
-      loadSettings(),
-      loadAppInfo(),
-      loadAccounts(),
-      loadProducts(),
+      settings.load(),
+      settings.loadAppInfo(),
+      accountState.load(),
+      gallery.load(),
       loadJobs(),
       loadAuditLogDir(),
       loadAuditEvents(),
     ]);
-    if (settingsReady && accountsReady) setupOpen = firstRunStep(accounts, libraryRoot) !== null;
+    if (settingsReady && accountsReady) setupOpen = firstRunStep(accountState.accounts, settings.libraryRoot) !== null;
   }
 
   async function refreshSetup() {
-    const [accountsReady, jobsReady] = await Promise.all([loadAccounts(), loadJobs()]);
+    const [accountsReady, jobsReady] = await Promise.all([accountState.load(), loadJobs()]);
     if (!accountsReady || !jobsReady) throw new Error($t("Could not refresh setup. Please try again."));
   }
 
   async function finishSetup() {
-    const [settingsReady, accountsReady] = await Promise.all([loadSettings(), loadAccounts(), loadProducts()]);
+    const [settingsReady, accountsReady] = await Promise.all([settings.load(), accountState.load(), gallery.load()]);
     if (!settingsReady || !accountsReady) throw new Error($t("Could not refresh setup. Please try again."));
     setupOpen = false;
-    resetAccountForm();
+    accountState.reset();
   }
 
-  async function loadAppInfo() {
-    appInfoLoading = true;
-
-    try {
-      appInfo = await native.getAppInfo();
-    } catch (err) {
-      appInfo = null;
-      notifyError(errorMessage(err));
-    } finally {
-      appInfoLoading = false;
-    }
-  }
-
-  async function loadSettings() {
-    if (settingsSaving) return;
-    const generation = settingsGeneration.invalidate();
-    settingsLoading = true;
-
-    try {
-      const [settings, defaultDownloadRoot] = await Promise.all([
-        commands.getSettings(),
-        systemDownloadRoot(),
-      ]);
-      if (!settingsGeneration.current(generation)) return;
-      $locale = normalizeLocale(settings.uiLocale);
-      autoExtract = savedAutoExtract = settings.autoExtract ?? true;
-      libraryRoot = settings.libraryRoot ?? "";
-      configuredDownloadRoot = settings.downloadRoot;
-      downloadRoot = settings.downloadRoot ?? defaultDownloadRoot;
-      savedLanguagePriority = [...settings.languagePriority];
-      draftLanguagePriority = buildLanguagePriority(
-        savedLanguagePriority,
-        normalizeLocale(settings.uiLocale),
-      );
-      titleLanguageFollowsUi = settings.titleLanguageFollowsUi;
-      return true;
-    } catch (err) {
-      if (settingsGeneration.current(generation))
-        notifyError(errorMessage(err));
-      return false;
-    } finally {
-      if (settingsGeneration.current(generation)) settingsLoading = false;
-    }
-  }
-
-  function changeUiLocale(next: UiLocale) {
-    if (settingsLoading || settingsSaving) return;
-    if (titleLanguageFollowsUi) draftLanguagePriority = defaultLanguagePriority(next);
-    $locale = next;
-  }
-
-  async function checkForUpdates() {
-    await appUpdate.check();
-  }
-
-  async function openReleases() {
-    try {
-      await native.openExternalUrl(`${GITHUB_URL}/releases`);
-    } catch (err) {
-      notifyError(errorMessage(err));
-    }
-  }
-
-  async function saveSettings(event: Event) {
-    event.preventDefault();
-    if (settingsLoading || settingsSaving) return;
-    settingsSaving = true;
-
-    try {
-      const settings = await commands.saveSettings({
-        autoExtract,
-        uiLocale: $locale,
-        libraryRoot: valueOrNull(libraryRoot),
-        downloadRoot: valueOrNull(downloadRoot),
-        titleLanguageFollowsUi,
-        ...(titleLanguageFollowsUi ? {} : { languagePriority: draftLanguagePriority }),
-      });
-      autoExtract = savedAutoExtract = settings.autoExtract ?? true;
-      const priorityChanged = !sameLanguagePriority(
-        settings.languagePriority,
-        savedLanguagePriority,
-      );
-      savedLanguagePriority = [...settings.languagePriority];
-      draftLanguagePriority = buildLanguagePriority(
-        savedLanguagePriority,
-        normalizeLocale(settings.uiLocale),
-      );
-      titleLanguageFollowsUi = settings.titleLanguageFollowsUi;
-      // Start invalidation synchronously after commit, before another await can
-      // allow an old list/detail response to overwrite the saved projection.
-      const refresh = priorityChanged
-        ? refreshLibraryAfterMutation(true)
-        : Promise.resolve();
-      const [defaultDownloadRoot] = await Promise.all([
-        systemDownloadRoot(),
-        refresh,
-      ]);
-      $locale = normalizeLocale(settings.uiLocale);
-      libraryRoot = settings.libraryRoot ?? "";
-      downloadRoot = settings.downloadRoot ?? defaultDownloadRoot;
-      notifySuccess($t("Settings saved"));
-    } catch (err) {
-      notifyError(errorMessage(err));
-    } finally {
-      settingsSaving = false;
-    }
-  }
-
-  async function chooseSettingsDirectory(kind: "library" | "download") {
-    try {
-      const fallbackRoot = await systemDownloadRoot();
-      const currentRoot = kind === "library" ? libraryRoot : downloadRoot;
-      const selected = await native.chooseDirectory({
-        canCreateDirectories: true,
-        defaultPath: currentRoot.trim() || fallbackRoot || undefined,
-        title:
-          kind === "library"
-            ? $t("Choose library folder")
-            : $t("Choose download staging folder"),
-      });
-
-      if (!selected) {
-        return;
-      }
-
-      if (kind === "library") {
-        libraryRoot = selected;
-      } else {
-        downloadRoot = selected;
-      }
-    } catch (err) {
-      notifyError(errorMessage(err));
-    }
-  }
-
-  async function useDefaultDownloadRoot() {
-    const root = await systemDownloadRoot();
-
-    if (root) {
-      downloadRoot = root;
-    }
-  }
-
-  async function systemDownloadRoot() {
-    try {
-      return await native.getSystemDownloadDirectory();
-    } catch {
-      return "";
-    }
-  }
-
-  async function loadAccounts() {
-    accountsLoading = true;
-
-    try {
-      accounts = await commands.listAccounts();
-      return true;
-    } catch (err) {
-      notifyError(errorMessage(err));
-      return false;
-    } finally {
-      accountsLoading = false;
-    }
-  }
-
-  async function saveAccount(event: Event) {
-    event.preventDefault();
-    accountSaving = true;
-
-    try {
-      const account = await commands.saveAccount({
-        id: editingAccountId,
-        label: accountLabel,
-        loginName: valueOrNull(accountLoginName),
-        password: valueOrNull(accountPassword),
-      });
-      notifySuccess(editingAccountId ? $t("Account updated") : $t("Account added"));
-      editAccount(account);
-      accountPassword = "";
-      await loadAccounts();
-      return true;
-    } catch (err) {
-      notifyError(errorMessage(err));
-      return false;
-    } finally {
-      accountSaving = false;
-    }
-  }
-
-  async function setAccountEnabled(account: Account, enabled: boolean) {
-    try {
-      await commands.setAccountEnabled(account.id, enabled);
-      await loadAccounts();
-      await loadProducts({ clampInvalidPage: true });
-    } catch (err) {
-      notifyError(errorMessage(err));
-    }
-  }
-
-  async function removeAccount(account: Account) {
-    const confirmed = await showConfirmationDialog({
-      eyebrow: $t("Account source"),
-      title: $t("Remove account?"),
-      message: $t("Remove {0}. Its saved credential and ownership source will be deleted. Cached product metadata and downloaded local folders are kept.", account.label),
-      confirmLabel: $t("Remove Account"),
-      cancelLabel: $t("Cancel"),
-      tone: "danger",
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      const report = await commands.removeAccount(account.id);
-
-      notifySuccess($t("Removed {0}", report.label));
-
-      if (editingAccountId === account.id) {
-        resetAccountForm();
-      }
-
-
-      await Promise.all([loadAccounts(), loadProducts({ resetPage: true })]);
-    } catch (err) {
-      notifyError(errorMessage(err));
-    }
-  }
-
-  function editAccount(account: Account) {
-    editingAccountId = account.id;
-    accountLabel = account.label;
-    accountLoginName = account.loginName ?? "";
-    accountPassword = "";
-  }
-
-  function resetAccountForm() {
-    editingAccountId = null;
-    accountLabel = "";
-    accountLoginName = "";
-    accountPassword = "";
-  }
-
-  async function loadProducts(options: ProductLoadOptions = {}) {
-    creditHydration.clearQueue();
-    if (options.resetPage) productPageIndex = 0;
-    await libraryQuery.load(productListRequest(), options.clampInvalidPage, { background: options.background });
-  }
+  async function openReleases() { await openExternalUrl(`${GITHUB_URL}/releases`, "GitHub"); }
 
   function invalidateLibrary() {
-    libraryQuery.invalidate();
+    gallery.invalidate();
     detailGeneration.invalidate();
   }
 
@@ -634,91 +322,28 @@
     invalidateLibrary();
     const detailId = productDetailLoadingWorkId ?? productDetail?.workId;
     await Promise.all([
-      activeView === "playlists" ? playlists.load().catch(cause=>notifyError(errorMessage(cause))) : Promise.resolve(),
-      loadProducts({ resetPage, clampInvalidPage: !resetPage, background: !resetPage }),
+      activeView === "playlists" ? playlists.load().catch(cause=>notifications.error(errorMessage(cause))) : Promise.resolve(),
+      gallery.load({ resetPage, clampInvalidPage: !resetPage, background: !resetPage }),
       detailId ? loadProductDetail(detailId, !resetPage) : Promise.resolve(),
     ]);
   }
 
-  function cycleMetadataFilter(kind: "genre"|"voice", name: string) {
-    const include = kind === "genre" ? "genreNames" : "voiceNames";
-    const exclude = kind === "genre" ? "excludedGenreNames" : "excludedVoiceNames";
-    if (metadataFilters[include].includes(name)) {
-      metadataFilters[include] = metadataFilters[include].filter(v => v !== name);
-      metadataFilters[exclude] = [...metadataFilters[exclude],name];
-    } else if (metadataFilters[exclude].includes(name)) {
-      metadataFilters[exclude] = metadataFilters[exclude].filter(v => v !== name);
-    } else { metadataFilters[include] = [...metadataFilters[include],name]; }
-    void loadProducts({resetPage:true});
-  }
-
-  function productListRequest(): commands.ProductListRequest {
-    return {
-      ...metadataFilters,
-      downloadedOnly: galleryScope === "downloaded",
-      search: valueOrNull(productSearch),
-      accountIds: [],
-      typeGroups: selectedProductTypes,
-      ageCategories: selectedAgeCategories,
-      sourceGroups: selectedProductSources,
-      makerKeys: selectedMakerKeys,
-      sort: productSort,
-      limit: PRODUCT_PAGE_SIZE,
-      offset: productPageOffset(),
-    };
-  }
-
-  function productPageOffset() {
-    return productPageIndex * PRODUCT_PAGE_SIZE;
-  }
-
-  function productPageCount() {
-    return Math.max(1, Math.ceil(totalProducts / PRODUCT_PAGE_SIZE));
-  }
-
-  function productTotalLabel() {
-    return $t(totalProducts === 1 ? "{0} work" : "{0} works", totalProducts);
-  }
-
-  function productRangeLabel() {
-    if (productsLoading) {
-      return totalProducts > 0
-        ? $t("Loading {0}", productTotalLabel())
-        : $t("Loading products");
-    }
-
-    if (totalProducts === 0 || products.length === 0) {
-      return productTotalLabel();
-    }
-
-    const start = Math.min(productPageOffset() + 1, totalProducts);
-    const end = Math.min(productPageOffset() + products.length, totalProducts);
-
-    return $t("{0}-{1} of {2}", start, end, totalProducts);
-  }
-
   async function reloadProducts() {
     creditHydration.retry();
-    await loadProducts({ clampInvalidPage: true });
-  }
-
-  async function goToProductPage(page: number) {
-    if (productsLoading || !Number.isInteger(page) || page < 1 || page > productPageCount()) return;
-    productPageIndex = page - 1;
-    await loadProducts({ clampInvalidPage: true });
+    await gallery.load({ clampInvalidPage: true });
   }
 
   function productBulkRequest(): commands.BulkWorkDownloadRequest {
     return {
-      ...metadataFilters,
-      search: valueOrNull(productSearch),
+      ...gallery.metadata,
+      search: valueOrNull(gallery.search),
       accountIds: [],
-      typeGroups: selectedProductTypes,
-      ageCategories: selectedAgeCategories,
-      sourceGroups: selectedProductSources,
-      makerKeys: selectedMakerKeys,
-      sort: productSort,
-      unpackPolicy: downloadUnpackPolicy,
+      typeGroups: gallery.typeGroups,
+      ageCategories: gallery.ageCategories,
+      sourceGroups: gallery.sourceGroups,
+      makerKeys: gallery.makerKeys,
+      sort: gallery.sort,
+      unpackPolicy: settings.unpackPolicy,
       skipDownloaded: true,
     };
   }
@@ -728,106 +353,92 @@
     try {
       localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(next));
     } catch {
-      notifyError($t("Selections are kept for this session, but could not be saved for the next launch."));
+      notifications.error($t("Selections are kept for this session, but could not be saved for the next launch."));
     }
   }
 
   function toggleSelection(product: Product, range: boolean) {
-    updateSelection(toggleProductSelection(selectedProducts, product, products, selectionAnchorId, range));
+    if (localWorkBusy) return;
+    updateCurrentSelection(toggleProductSelection(currentSelection, product, gallery.products, selectionAnchorId, range, activeView === "downloaded"));
     selectionAnchorId = product.workId;
   }
 
   function selectCurrentPage() {
-    updateSelection(addProducts(selectedProducts, products));
+    if (localWorkBusy) return;
+    updateCurrentSelection(addProducts(currentSelection, gallery.products, activeView === "downloaded"));
     selectionAnchorId = null;
   }
 
   function deselectCurrentPage() {
-    const visibleIds = new Set(products.map((product) => product.workId));
-    updateSelection(selectedProducts.filter((product) => !visibleIds.has(product.workId)));
+    if (localWorkBusy) return;
+    const visibleIds = new Set(gallery.products.map((product) => product.workId));
+    updateCurrentSelection(currentSelection.filter((product) => !visibleIds.has(product.workId)));
     selectionAnchorId = null;
   }
 
   function removeFromSelection(workId: string) {
-    updateSelection(selectedProducts.filter((product) => product.workId !== workId));
+    if (!localWorkBusy) updateCurrentSelection(currentSelection.filter((product) => product.workId !== workId));
   }
 
   function clearSelection() {
-    updateSelection([]);
+    if (localWorkBusy) return;
+    updateCurrentSelection([]);
     selectionAnchorId = null;
   }
 
+  function updateCurrentSelection(next: SelectedProduct[]) {
+    if (activeView === "downloaded") downloadedSelection = next;
+    else updateSelection(next);
+  }
+
+  async function manageDownloadedSelection(operation: LocalWorkOperation) {
+    if (localWorkBusy || !downloadedSelection.length) return;
+    const snapshot = downloadedSelection.map((item) => item.workId);
+    localWorkBusy = true;
+    localWorkProgress = null;
+    try {
+      let destination: string | null = null;
+      if (operation === "delete") {
+        const confirmed = await confirmations.show({
+          eyebrow: $t("Delete selected files"),
+          title: $t("Delete local files for {0} selected works?", snapshot.length),
+          message: $t("This permanently deletes the selected work folders and staging files. Library metadata and purchase records are kept. This cannot be undone."),
+          confirmLabel: $t("Delete selected files"), cancelLabel: $t("Cancel"), tone: "danger",
+        });
+        if (!confirmed) return;
+      } else {
+        const chosen = await native.chooseDirectory({
+          title: $t("Choose export destination"), canCreateDirectories: true,
+        });
+        if (typeof chosen !== "string") return;
+        destination = chosen;
+      }
+      // Open progress only after the decision; otherwise this modal can cover
+      // the confirmation in the browser's top layer and block every action.
+      selectionReviewOpen = true;
+      const result = await runLocalWorkBatch(snapshot, operation, destination, {
+        deleteWorkDownload: (id) => commands.deleteWorkDownload(id, true),
+        exportWorkDownload: commands.exportWorkDownload,
+      },
+        (progress) => { localWorkProgress = progress; }, setProductDownload);
+      if (operation === "delete") {
+        const removed = new Set(result.succeeded);
+        downloadedSelection = downloadedSelection.filter((item) => !removed.has(item.workId));
+        await refreshLibraryAfterMutation();
+      }
+      const message = $t("{0} succeeded, {1} failed", result.succeeded.length, result.failures.length);
+      if (result.failures.length) notifications.error(message);
+      else notifications.success(message);
+    } catch (error) {
+      notifications.error(errorMessage(error));
+    } finally {
+      localWorkBusy = false;
+    }
+  }
+
   function downloadAccountId() {
-    const enabled = accounts.filter(account => account.enabled);
+    const enabled = accountState.accounts.filter(account => account.enabled);
     return enabled.length === 1 ? enabled[0].id : null;
-  }
-
-  function toggleFilterValue(values: string[], value: string) {
-    return values.includes(value)
-      ? values.filter((candidate) => candidate !== value)
-      : [...values, value];
-  }
-
-  async function toggleProductTypeFilter(typeGroup: string) {
-    selectedProductTypes = toggleFilterValue(selectedProductTypes, typeGroup);
-    await loadProducts({ resetPage: true });
-  }
-
-  async function toggleAgeFilter(ageCategory: string) {
-    selectedAgeCategories = toggleFilterValue(
-      selectedAgeCategories,
-      ageCategory,
-    );
-    await loadProducts({ resetPage: true });
-  }
-
-  async function toggleProductSourceFilter(sourceGroup: string) {
-    selectedProductSources = toggleFilterValue(
-      selectedProductSources,
-      sourceGroup,
-    );
-    await loadProducts({ resetPage: true });
-  }
-
-  async function toggleMakerFilter(makerKey: string) {
-    selectedMakerKeys = toggleFilterValue(selectedMakerKeys, makerKey);
-    await loadProducts({ resetPage: true });
-  }
-
-  async function clearTypeFilters() {
-    selectedProductTypes = [];
-    await loadProducts({ resetPage: true });
-  }
-
-  async function clearAgeFilters() {
-    selectedAgeCategories = [];
-    await loadProducts({ resetPage: true });
-  }
-
-  async function clearSourceFilters() {
-    selectedProductSources = [];
-    await loadProducts({ resetPage: true });
-  }
-
-  async function clearMakerFilters() {
-    selectedMakerKeys = [];
-    await loadProducts({ resetPage: true });
-  }
-
-  async function setProductSort(sort: string) {
-    productSort = sort;
-    await loadProducts({ resetPage: true });
-  }
-
-  async function resetLibraryFilters() {
-    metadataFilters = { genreNames: [], excludedGenreNames: [], voiceNames: [], excludedVoiceNames: [] };
-    productSearch = "";
-    selectedProductTypes = [];
-    selectedAgeCategories = [];
-    selectedProductSources = [];
-    selectedMakerKeys = [];
-    productSort = "latestPurchaseDesc";
-    await loadProducts({ resetPage: true });
   }
 
   async function loadJobs() {
@@ -835,7 +446,7 @@
       await jobController.load();
       return true;
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
       return false;
     }
   }
@@ -843,7 +454,7 @@
   async function handleJobEvent(event: JobEvent) {
     if (event.kind === "accountSync" && isTerminalJob(event.snapshot)) {
       await Promise.all([
-        loadAccounts(),
+        accountState.load(),
         refreshLibraryAfterMutation(),
         loadAuditEvents(),
       ]);
@@ -858,8 +469,11 @@
   }
 
   function setProductDownload(workId: string, download: ProductDownload) {
+    if (download.status !== "downloaded") {
+      downloadedSelection = downloadedSelection.filter((item) => item.workId !== workId);
+    }
     invalidateLibrary();
-    products = products.map((product) =>
+    gallery.products = gallery.products.map((product) =>
       product.workId === workId
         ? {
             ...product,
@@ -877,15 +491,15 @@
   }
 
   async function searchProducts() {
-    await loadProducts({ resetPage: true });
+    await gallery.load({ resetPage: true });
   }
 
   async function copyWorkId(workId: string) {
     try {
       await navigator.clipboard.writeText(workId);
-      notifySuccess($t("Copied work ID {0}", workId));
+      notifications.success($t("Copied work ID {0}", workId));
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -896,13 +510,13 @@
 
     try {
       await navigator.clipboard.writeText(field.value);
-      notifySuccess(
+      notifications.success(
         workId
           ? $t("Copied {0} for {1}", $t(field.label), workId)
           : $t("Copied {0}", $t(field.label)),
       );
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -919,11 +533,11 @@
 
     try {
       await navigator.clipboard.writeText(normalized);
-      notifySuccess(
+      notifications.success(
         workId ? $t("Copied {0} for {1}", label, workId) : $t("Copied {0}", label),
       );
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -932,7 +546,7 @@
   }
 
   function applyProductCredits(detail: ProductDetail) {
-    products = products.map((product) => product.workId === detail.workId
+    gallery.products = gallery.products.map((product) => product.workId === detail.workId
       ? { ...product, creditGroups: detail.creditGroups, tags: detail.tags }
       : product);
     if (productDetail?.workId === detail.workId) {
@@ -951,7 +565,7 @@
         applyProductCredits(detail);
       }
     } catch (err) {
-      if (detailGeneration.current(generation)) notifyError(errorMessage(err));
+      if (detailGeneration.current(generation)) notifications.error(errorMessage(err));
     } finally {
       if (detailGeneration.current(generation))
         productDetailLoadingWorkId = null;
@@ -988,21 +602,21 @@
     try {
       const response = await commands.startAccountSync(
         account.id,
-        editingAccountId === account.id ? valueOrNull(accountPassword) : null,
+        accountState.editingId === account.id ? valueOrNull(accountState.password) : null,
       );
-      notifyInfo($t("Sync queued"));
+      notifications.info($t("Sync queued"));
       jobController.setMessage(response.jobId, $t("Sync queued"));
-      accountPassword = "";
+      accountState.password = "";
       await loadJobs();
       return true;
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
       return false;
     }
   }
 
   async function syncEnabledAccounts() {
-    const enabledAccounts = accounts.filter(
+    const enabledAccounts = accountState.accounts.filter(
       (account) => account.enabled && !activeAccountSyncJob(account.id),
     );
 
@@ -1037,15 +651,15 @@
         workId: product.workId,
         accountId: downloadAccountId(),
         password: null,
-        unpackPolicy: options.unpackPolicy ?? downloadUnpackPolicy,
+        unpackPolicy: options.unpackPolicy ?? settings.unpackPolicy,
         replaceExisting: options.replaceExisting ?? false,
       });
       const queuedMessage = options.queuedMessage ?? $t("Download queued");
-      notifyInfo($t("{0} for {1}", queuedMessage, product.workId));
+      notifications.info($t("{0} for {1}", queuedMessage, product.workId));
       jobController.setMessage(response.jobId, queuedMessage);
       await loadJobs();
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -1054,7 +668,7 @@
     // Freeze IDs and metadata before the async preview. The confirmation must start
     // exactly this selection even if the Library query changes while planning.
     const selection = selectedOnly ? selectedProducts.map((item) => ({ ...item })) : undefined;
-    const request = { ...(selection ? selectedDownloadRequest(selection, downloadUnpackPolicy) : productBulkRequest()), maxConcurrentWorks: batchConcurrency };
+    const request = { ...(selection ? selectedDownloadRequest(selection, settings.unpackPolicy) : productBulkRequest()), maxConcurrentWorks: batchConcurrency };
     selectionReviewOpen = false;
     bulkDownloadPlanning = true;
 
@@ -1080,11 +694,11 @@
 
       const response =
         await commands.startBulkWorkDownload(request);
-      notifyInfo($t("Bulk download queued"));
+      notifications.info($t("Bulk download queued"));
       jobController.setMessage(response.jobId, $t("Bulk download queued"));
       await loadJobs();
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     } finally {
       bulkDownloadPlanning = false;
     }
@@ -1098,7 +712,7 @@
     try {
       await commands.openWorkDownload(product.workId);
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -1110,7 +724,7 @@
   }
 
   async function redownloadProduct(product: Product) {
-    const confirmed = await showConfirmationDialog({
+    const confirmed = await confirmations.show({
       eyebrow: $t("Re-download"),
       title: $t("Re-download {0}?", product.workId),
       message:
@@ -1125,14 +739,14 @@
     }
 
     await startWorkDownload(product, {
-      unpackPolicy: downloadUnpackPolicy,
+      unpackPolicy: settings.unpackPolicy,
       replaceExisting: true,
       queuedMessage: $t("Re-download queued"),
     });
   }
 
   async function deleteDownloadedProduct(product: Product) {
-    const confirmed = await showConfirmationDialog({
+    const confirmed = await confirmations.show({
       eyebrow: $t("Delete Download"),
       title: $t("Delete downloaded files for {0}?", product.workId),
       message:
@@ -1148,17 +762,17 @@
 
     try {
       const download = await commands.deleteWorkDownload(product.workId);
-      notifySuccess($t("Deleted download for {0}", product.workId));
+      notifications.success($t("Deleted download for {0}", product.workId));
       setProductDownload(product.workId, download);
       await refreshLibraryAfterMutation();
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
   async function markProductDownloaded(product: Product) {
     try {
-      const fallbackRoot = libraryRoot.trim() || (await systemDownloadRoot());
+      const fallbackRoot = settings.libraryRoot.trim() || (await settings.systemDownloadRoot());
       const selected = await native.chooseDirectory({
         canCreateDirectories: false,
         defaultPath: fallbackRoot || undefined,
@@ -1173,11 +787,11 @@
         product.workId,
         selected,
       );
-      notifySuccess($t("Marked {0} as downloaded", product.workId));
+      notifications.success($t("Marked {0} as downloaded", product.workId));
       setProductDownload(product.workId, download);
       await refreshLibraryAfterMutation();
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -1185,23 +799,14 @@
     try {
       await commands.cancelJob(job.id);
       const workId = jobWorkId(job) ?? jobOutputString(job, "workId");
-      notifyInfo(
+      notifications.info(
         workId
           ? $t("Cancellation requested for {0}", workId)
           : $t("Cancellation requested"),
       );
       await loadJobs();
     } catch (err) {
-      notifyError(errorMessage(err));
-    }
-  }
-
-  async function clearFinishedJobs() {
-    try {
-      await commands.clearFinishedJobs();
-      await loadJobs();
-    } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -1213,7 +818,7 @@
       const events = await commands.listAuditEvents(500);
       if (auditGeneration.current(generation)) auditEvents = events;
     } catch (err) {
-      if (auditGeneration.current(generation)) notifyError(errorMessage(err));
+      if (auditGeneration.current(generation)) notifications.error(errorMessage(err));
     } finally {
       if (auditGeneration.current(generation)) auditLoading = false;
     }
@@ -1224,7 +829,7 @@
       const result = await commands.getAuditLogDir();
       auditLogDir = result.path;
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -1232,7 +837,7 @@
     try {
       await commands.openAuditLogDir();
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -1240,7 +845,7 @@
     try {
       await commands.openDownloadFolder();
     } catch (err) {
-      notifyError(errorMessage(err));
+      notifications.error(errorMessage(err));
     }
   }
 
@@ -1248,7 +853,7 @@
     try {
       await native.openExternalUrl(url);
     } catch (err) {
-      notifyError($t("Failed to open {0}: {1}", label, errorMessage(err)));
+      notifications.error($t("Failed to open {0}: {1}", label, errorMessage(err)));
     }
   }
 
@@ -1312,11 +917,6 @@
     return "idle";
   }
 
-  function syncingAccountCount() {
-    return accounts.filter((account) => activeAccountSyncJob(account.id))
-      .length;
-  }
-
   function accountSyncJobs(accountId: string) {
     return jobController.jobs.filter(
       (job) => job.kind === "accountSync" && jobAccountId(job) === accountId,
@@ -1358,10 +958,6 @@
     return planningJob ? jobLabel(planningJob, $locale) : $t("Planning");
   }
 
-  function visibleJobs() {
-    return [...jobController.jobs].reverse();
-  }
-
   function currentDownloadJobs() {
     return jobController.jobs.filter(
       (job) => isDownloadQueueJob(job) && isActiveJob(job),
@@ -1373,27 +969,9 @@
   }
 
   function hasSyncableEnabledAccount() {
-    return accounts.some(
+    return accountState.accounts.some(
       (account) => account.enabled && !activeAccountSyncJob(account.id),
     );
-  }
-
-  function jobAccountLabel(job: JobSnapshot) {
-    if (job.kind === "bulkWorkDownload") {
-      return $t("Bulk download");
-    }
-
-    if (job.kind === "bulkWorkDownloadPreview") {
-      return $t("Bulk planning");
-    }
-
-    if (job.kind === "workDownload") {
-      return jobWorkId(job) ?? job.title;
-    }
-
-    const accountId = jobAccountId(job);
-    const account = accounts.find((item) => item.id === accountId);
-    return account?.label ?? accountId ?? job.title;
   }
 
   function jobDetail(job: JobSnapshot) {
@@ -1427,53 +1005,15 @@
 
     const workId = jobWorkId(job) ?? jobOutputString(job, "workId");
     const product = workId
-      ? products.find((item) => item.workId === workId)
+      ? gallery.products.find((item) => item.workId === workId)
       : null;
     return product?.title ?? workId ?? job.title;
   }
 
   function showBulkDownloadDialog(
-    preview: BulkWorkDownloadPreview,
-    kind: BulkDownloadDialog["kind"],
-    selectedProducts?: SelectedProduct[],
-    space?: commands.SpaceReport,
-  ) {
-    if (bulkDownloadDialogResolve) {
-      bulkDownloadDialogResolve(false);
-    }
-
-    return new Promise<boolean>((resolve) => {
-      bulkDownloadDialogResolve = resolve;
-      bulkDownloadDialog = { kind, preview, selectedProducts, space };
-    });
-  }
-
-  function closeBulkDownloadDialog(confirmed = false) {
-    const resolve = bulkDownloadDialogResolve;
-
-    bulkDownloadDialogResolve = null;
-    bulkDownloadDialog = null;
-    resolve?.(confirmed);
-  }
-
-  function showConfirmationDialog(dialog: ConfirmationDialog) {
-    if (confirmationDialogResolve) {
-      confirmationDialogResolve(false);
-    }
-
-    return new Promise<boolean>((resolve) => {
-      confirmationDialogResolve = resolve;
-      confirmationDialog = dialog;
-    });
-  }
-
-  function closeConfirmationDialog(confirmed = false) {
-    const resolve = confirmationDialogResolve;
-
-    confirmationDialogResolve = null;
-    confirmationDialog = null;
-    resolve?.(confirmed);
-  }
+    preview: BulkWorkDownloadPreview, kind: BulkDownloadDialog["kind"],
+    selectedProducts?: SelectedProduct[], space?: commands.SpaceReport,
+  ) { return bulkConfirmation.show({ kind, preview, selectedProducts, space }); }
 
   function productDownloadActionDisabled(
     product: Product,
@@ -1494,10 +1034,6 @@
     await startWorkDownload(product);
   }
 
-  function notifySuccess(message: string) {
-    pushToast("success", message);
-  }
-
   function viewErrorActivity(target: DiagnosticTarget) {
     // Preserve an open editor, confirmation, or MFA prompt beneath the details.
     if (!hasOpenModal()) {
@@ -1510,74 +1046,14 @@
     playlistMenu=null;
     creditHydration.clearQueue();
     if (view === "library" || view === "downloaded") {
-      if (galleryScope !== view) {
-        // Each gallery keeps its own query and page; saved selections remain global.
-        galleryQueries[galleryScope] = {
-          request: JSON.parse(JSON.stringify(productListRequest())),
-          filtersOpen: libraryFiltersOpen,
-        };
-        const saved = galleryQueries[view];
-        const query = saved?.request;
-        galleryScope = view;
-        metadataFilters = { genreNames: query?.genreNames ?? [], excludedGenreNames: query?.excludedGenreNames ?? [], voiceNames: query?.voiceNames ?? [], excludedVoiceNames: query?.excludedVoiceNames ?? [] };
-        productSearch = query?.search ?? "";
-        selectedProductTypes = query?.typeGroups ?? [];
-        selectedAgeCategories = query?.ageCategories ?? [];
-        selectedProductSources = query?.sourceGroups ?? [];
-        selectedMakerKeys = query?.makerKeys ?? [];
-        productSort = query?.sort ?? "latestPurchaseDesc";
-        productPageIndex = Math.floor((query?.offset ?? 0) / PRODUCT_PAGE_SIZE);
-        libraryFiltersOpen = saved?.filtersOpen ?? false;
-        products = [];
-        totalProducts = 0;
-        productFilterFacets = { makers: [] };
-        selectionAnchorId = null;
-      }
-      void loadProducts({ clampInvalidPage: true });
+      if (gallery.setScope(view)) selectionAnchorId = null;
+      void gallery.load({ clampInvalidPage: true });
     }
     activeView = view;
-    if (view === "playlists") void playlists.load().catch(cause=>notifyError(errorMessage(cause)));
+    if (view === "playlists") void playlists.load().catch(cause=>notifications.error(errorMessage(cause)));
     if (view === "settings" && settingsTab === "logs") void loadAuditEvents();
   }
 
-  function notifyInfo(message: string) {
-    pushToast("info", message);
-  }
-
-  function notifyError(message: string) {
-    pushToast("error", message, 7000);
-  }
-
-  function pushToast(kind: ToastKind, message: string, duration = 3600) {
-    const id = `toast-${Date.now()}-${toastSequence++}`;
-    const toast = { id, kind, message };
-    toasts = [toast, ...toasts].slice(0, 5);
-
-    const timer = setTimeout(() => dismissToast(id), duration);
-    toastTimers.set(id, timer);
-    clearOrphanedToastTimers();
-  }
-
-  function dismissToast(id: string) {
-    toasts = toasts.filter((toast) => toast.id !== id);
-
-    const timer = toastTimers.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      toastTimers.delete(id);
-    }
-  }
-
-  function clearOrphanedToastTimers() {
-    const visibleToastIds = new Set(toasts.map((toast) => toast.id));
-
-    for (const [id, timer] of toastTimers.entries()) {
-      if (!visibleToastIds.has(id)) {
-        clearTimeout(timer);
-        toastTimers.delete(id);
-      }
-    }
-  }
   $effect(() => {
     if (typeof document !== "undefined") document.documentElement.lang = $locale;
   });
@@ -1590,7 +1066,7 @@
 <AppShell
   {activeView}
   playerActive={Boolean(player.media)}
-  version={appInfo?.version ?? ""}
+  version={settings.appInfo?.version ?? ""}
   onNavigate={navigate}
   onOpenDownloadFolder={openDownloadFolder}
   onOpenPlay={() => requestOnlinePlay()}
@@ -1601,58 +1077,60 @@
   {/snippet}
   {#if activeView === "library" || activeView === "downloaded"}
     <LibraryView
-      {metadataFilters}
-      onCycleMetadataFilter={cycleMetadataFilter}
+      metadataFilters={gallery.metadata}
+      onCycleMetadataFilter={gallery.cycleMetadata}
       downloadedOnly={activeView === "downloaded"}
       {creditLoadingWorkIds}
-      {products}
-      loading={productsLoading}
-      bind:search={productSearch}
-      filtersOpen={libraryFiltersOpen}
-      facets={productFilterFacets}
-      sort={productSort}
-      selectedSources={selectedProductSources}
-      selectedAges={selectedAgeCategories}
-      selectedTypes={selectedProductTypes}
-      selectedMakers={selectedMakerKeys}
-      rangeLabel={productRangeLabel()}
-      pageNumber={productPageIndex + 1}
-      pageCount={productPageCount()}
-      syncDisabled={accountsLoading ||
+      products={gallery.products}
+      loading={gallery.loading}
+      bind:search={gallery.search}
+      filtersOpen={gallery.filtersOpen}
+      facets={gallery.facets}
+      sort={gallery.sort}
+      selectedSources={gallery.sourceGroups}
+      selectedAges={gallery.ageCategories}
+      selectedTypes={gallery.typeGroups}
+      selectedMakers={gallery.makerKeys}
+      rangeLabel={gallery.rangeLabel($t)}
+      pageNumber={gallery.pageIndex + 1}
+      pageCount={gallery.pageCount}
+      syncDisabled={accountState.loading ||
         jobController.loading ||
         !hasSyncableEnabledAccount()}
       bulkDisabled={bulkDownloadPlanning ||
-        productsLoading ||
+        gallery.loading ||
         jobController.loading ||
-        totalProducts === 0}
+        gallery.total === 0}
       bulkLabel={bulkDownloadButtonLabel()}
-      selectedWorkIds={activeView === "library" ? selectedProducts.map((product) => product.workId) : []}
-      selectedSizeLabel={selectionSizeLabel(selectedProducts, $locale)}
-      selectedDownloadDisabled={bulkDownloadPlanning || jobController.loading}
-      onToggleSelection={activeView === "library" ? toggleSelection : undefined}
-      onSelectPage={activeView === "library" ? selectCurrentPage : undefined}
+      selectedWorkIds={currentSelection.map((product) => product.workId)}
+      selectedSizeLabel={activeView === "library" ? selectionSizeLabel(selectedProducts, $locale) : ""}
+      selectedDownloadDisabled={localWorkBusy || bulkDownloadPlanning || jobController.loading}
+      onToggleSelection={toggleSelection}
+      onSelectPage={selectCurrentPage}
       onClearPage={deselectCurrentPage}
       onClearSelection={clearSelection}
-      onReviewSelection={() => (selectionReviewOpen = true)}
+      onReviewSelection={() => { if (!localWorkBusy) localWorkProgress = null; selectionReviewOpen = true; }}
       onDownloadSelected={() => startBulkWorkDownload(true)}
+      onDeleteSelected={() => manageDownloadedSelection("delete")}
+      onExportSelected={() => manageDownloadedSelection("export")}
       detailLoadingWorkId={productDetailLoadingWorkId}
       getActiveJob={(product) => activeWorkDownloadJob(product.workId)}
       onSearch={searchProducts}
-      onReset={resetLibraryFilters}
-      onToggleFilters={() => (libraryFiltersOpen = !libraryFiltersOpen)}
+      onReset={gallery.resetFilters}
+      onToggleFilters={() => (gallery.filtersOpen = !gallery.filtersOpen)}
       onReload={reloadProducts}
       onSync={syncEnabledAccounts}
       onBulkDownload={() => startBulkWorkDownload(false)}
-      onSetSort={setProductSort}
-      onClearSources={clearSourceFilters}
-      onToggleSource={toggleProductSourceFilter}
-      onClearAges={clearAgeFilters}
-      onToggleAge={toggleAgeFilter}
-      onClearTypes={clearTypeFilters}
-      onToggleType={toggleProductTypeFilter}
-      onClearMakers={clearMakerFilters}
-      onToggleMaker={toggleMakerFilter}
-      onGoToPage={goToProductPage}
+      onSetSort={gallery.setSort}
+      onClearSources={() => gallery.clearFilter("sourceGroups")}
+      onToggleSource={value => gallery.toggleFilter("sourceGroups", value)}
+      onClearAges={() => gallery.clearFilter("ageCategories")}
+      onToggleAge={value => gallery.toggleFilter("ageCategories", value)}
+      onClearTypes={() => gallery.clearFilter("typeGroups")}
+      onToggleType={value => gallery.toggleFilter("typeGroups", value)}
+      onClearMakers={() => gallery.clearFilter("makerKeys")}
+      onToggleMaker={value => gallery.toggleFilter("makerKeys", value)}
+      onGoToPage={gallery.goToPage}
       onOpenDetails={openProductDetail}
       onOpenDlsite={openDlsiteProductPage}
       onOpenOnline={requestOnlinePlay}
@@ -1665,66 +1143,66 @@
       playlistBusy={playlists.busy}
       defaultPlaylistWorkIds={playlists.lists.find(list=>list.id==="0")?.workIds ?? []}
       onTagSearch={(name) => {
-        productSearch = appendSearchToken(productSearch,"tag",name);
-        if (!parseProductSearch(productSearch).error) void searchProducts();
+        gallery.search = appendSearchToken(gallery.search,"tag",name);
+        if (!parseProductSearch(gallery.search).error) void searchProducts();
       }}
       onPrecisionSearch={(kind,name) => {
-        productSearch = appendSearchToken(productSearch,kind,name);
-        if (!parseProductSearch(productSearch).error) void searchProducts();
+        gallery.search = appendSearchToken(gallery.search,kind,name);
+        if (!parseProductSearch(gallery.search).error) void searchProducts();
       }}
     />
   {:else if activeView === "playlists"}
     <PlaylistsView controller={playlists} onOpenDetails={openProductDetail} onCopyWorkId={copyWorkId} onOpenPlayer={openPlayer}
       onOpenFolder={openDownloadedProduct} onOpenDlsite={openDlsiteProductPage} onOpenOnline={requestOnlinePlay} onDownload={runProductDownloadAction} getActiveJob={(product) => activeWorkDownloadJob(product.workId)} onTogglePlaylist={(work)=>void togglePlaylist(work)}
-      onChoosePlaylist={choosePlaylist} onError={notifyError} detailLoadingWorkId={productDetailLoadingWorkId} />
+      onChoosePlaylist={choosePlaylist} onError={notifications.error} detailLoadingWorkId={productDetailLoadingWorkId} />
   {:else}
     <SettingsView
       bind:tab={settingsTab}
       onTabChange={(tab) => { if (tab === "logs") void loadAuditEvents(); }}
       bind:uiLocale={$locale}
-      onLocaleChange={changeUiLocale}
-      bind:libraryRoot
-      bind:downloadRoot
-      bind:autoExtract
-      bind:languagePriority={draftLanguagePriority}
-      bind:titleLanguageFollowsUi
-      loading={settingsLoading}
-      saving={settingsSaving}
-      {appInfo}
-      {appInfoLoading}
+      onLocaleChange={settings.changeLocale}
+      bind:libraryRoot={settings.libraryRoot}
+      bind:downloadRoot={settings.downloadRoot}
+      bind:autoExtract={settings.autoExtract}
+      bind:languagePriority={settings.draftLanguagePriority}
+      bind:titleLanguageFollowsUi={settings.titleLanguageFollowsUi}
+      loading={settings.loading}
+      saving={settings.saving}
+      appInfo={settings.appInfo}
+      appInfoLoading={settings.appInfoLoading}
       updateBusy={appUpdate.busy}
-      onReload={loadSettings}
-      onChooseDirectory={chooseSettingsDirectory}
-      onUseDefaultDownloadRoot={useDefaultDownloadRoot}
-      onSave={saveSettings}
+      onReload={settings.load}
+      onChooseDirectory={settings.chooseDirectory}
+      onUseDefaultDownloadRoot={settings.useDefaultDownloadRoot}
+      onSave={settings.save}
       onOpenGitHub={() => openExternalUrl(GITHUB_URL, "GitHub")}
       onOpenDlsite={() => openExternalUrl(DLSITE_URL, "DLsite")}
-      onCheckForUpdates={checkForUpdates}
+      onCheckForUpdates={() => appUpdate.check()}
     >
       {#snippet accountSettings()}
         <AccountsView embedded
-          {accounts}
-          loading={accountsLoading}
-          saving={accountSaving}
+          accounts={accountState.accounts}
+          loading={accountState.loading}
+          saving={accountState.saving}
           jobsLoading={jobController.loading}
-          {editingAccountId}
-          bind:label={accountLabel}
-          bind:loginName={accountLoginName}
-          bind:password={accountPassword}
-          syncingCount={syncingAccountCount()}
+          editingAccountId={accountState.editingId}
+          bind:label={accountState.label}
+          bind:loginName={accountState.loginName}
+          bind:password={accountState.password}
+
           syncAllDisabled={!hasSyncableEnabledAccount()}
           getActiveSyncJob={activeAccountSyncJob}
           getStatusLabel={accountStatusLabel}
           getStatusTone={accountStatusTone}
-          onReload={loadAccounts}
+          onReload={accountState.load}
           onSyncAll={syncEnabledAccounts}
-          onToggleEnabled={setAccountEnabled}
-          onEdit={editAccount}
+          onToggleEnabled={accountState.setEnabled}
+          onEdit={accountState.edit}
           onSync={syncAccount}
           onCancelSync={cancelAccountSync}
-          onRemove={removeAccount}
-          onReset={resetAccountForm}
-          onSave={saveAccount}
+          onRemove={accountState.remove}
+          onReset={accountState.reset}
+          onSave={accountState.save}
         />
       {/snippet}
       {#snippet logs()}
@@ -1742,16 +1220,16 @@
 
   <UpdateDialog update={appUpdate} onOpenReleases={openReleases} />
   <ConfirmationDialogView
-    dialog={confirmationDialog}
-    onClose={closeConfirmationDialog}
+    dialog={confirmations.dialog}
+    onClose={confirmations.close}
   />
 
   {#if setupOpen}
     <FirstRunSetup
-      {accounts}
+      accounts={accountState.accounts}
       jobs={jobController.jobs}
-      initialLibraryRoot={libraryRoot}
-      initialDownloadRoot={configuredDownloadRoot}
+      initialLibraryRoot={settings.libraryRoot}
+      initialDownloadRoot={settings.configuredDownloadRoot}
       onRefresh={refreshSetup}
       onComplete={finishSetup}
     />
@@ -1764,10 +1242,21 @@
   />
   <BulkDownloadDialogView
     bind:concurrency={batchConcurrency}
-    dialog={bulkDownloadDialog}
-    onClose={closeBulkDownloadDialog}
+    dialog={bulkConfirmation.dialog}
+    onClose={bulkConfirmation.close}
   />
   {#if selectionReviewOpen}
+    {#if activeView === "downloaded"}
+    <DownloadedWorksDialog
+      products={downloadedSelection}
+      busy={localWorkBusy}
+      progress={localWorkProgress}
+      onRemove={removeFromSelection}
+      onClose={() => (selectionReviewOpen = false)}
+      onDelete={() => manageDownloadedSelection("delete")}
+      onExport={() => manageDownloadedSelection("export")}
+    />
+    {:else}
     <SelectedWorksDialog
       products={selectedProducts}
       disabled={bulkDownloadPlanning || jobController.loading}
@@ -1775,6 +1264,7 @@
       onClose={() => (selectionReviewOpen = false)}
       onDownload={() => startBulkWorkDownload(true)}
     />
+    {/if}
   {/if}
   <ProductDetailDialog
     detail={productDetail}
@@ -1818,7 +1308,7 @@
     {/key}
   {/if}
 
-  <ToastStack {toasts} onDismiss={dismissToast} onViewActivity={viewErrorActivity} />
+  <ToastStack toasts={notifications.toasts} onDismiss={notifications.dismiss} onViewActivity={viewErrorActivity} />
 </AppShell>
 
 {#if playlistMenu}

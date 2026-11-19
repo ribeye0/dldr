@@ -27,7 +27,6 @@
     label = $bindable(""),
     loginName = $bindable(""),
     password = $bindable(""),
-    syncingCount = 0,
     syncAllDisabled = false,
     getActiveSyncJob,
     getStatusLabel,
@@ -51,7 +50,6 @@
     label?: string;
     loginName?: string;
     password?: string;
-    syncingCount?: number;
     syncAllDisabled?: boolean;
     getActiveSyncJob: (accountId: string) => JobSnapshot | null;
     getStatusLabel: (account: Account) => string;
@@ -117,15 +115,12 @@
     </p>{:else}
     {#each accounts as account (account.id)}<AccountSourceRow
         {account}
-        selected={editingAccountId === account.id && editorOpen}
         statusLabel={getStatusLabel(account)}
         statusTone={getStatusTone(account)}
         activeSyncJob={getActiveSyncJob(account.id)}
-        {onToggleEnabled}
         onSelect={edit}
         {onSync}
         {onCancelSync}
-        {onRemove}
       />{/each}
   {/if}
 </section>
@@ -141,7 +136,6 @@
       bind:label
       bind:loginName
       bind:password
-      {onReset}
       onSave={save}
     />
     {#if selectedAccount}<div

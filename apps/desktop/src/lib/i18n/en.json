@@ -899,5 +899,18 @@
   "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.",
   "Auto-follow playback": "Auto-follow playback",
   "Turn off to browse the script freely.": "Turn off to browse the script freely.",
-  "Click the blank area of a work card to open the player.": "Click the blank area of a work card to open the player."
+  "Click the blank area of a work card to open the player.": "Click the blank area of a work card to open the player.",
+  "Selected downloaded works ({0})": "Selected downloaded works ({0})",
+  "Export copies each work folder to your chosen location and keeps the original files. Existing folders are never overwritten.": "Export copies each work folder to your chosen location and keeps the original files. Existing folders are never overwritten.",
+  "You can close this window. The operation will continue in the background.": "You can close this window. The operation will continue in the background.",
+  "Deleting works: {0} / {1}": "Deleting works: {0} / {1}",
+  "Exporting works: {0} / {1}": "Exporting works: {0} / {1}",
+  "{0} succeeded, {1} failed": "{0} succeeded, {1} failed",
+  "Delete selected files": "Delete selected files",
+  "Export selected folders": "Export selected folders",
+  "Downloaded work selection": "Downloaded work selection",
+  "Select downloaded work; Shift-click to select a range": "Select downloaded work; Shift-click to select a range",
+  "Delete local files for {0} selected works?": "Delete local files for {0} selected works?",
+  "This permanently deletes the selected work folders and staging files. Library metadata and purchase records are kept. This cannot be undone.": "This permanently deletes the selected work folders and staging files. Library metadata and purchase records are kept. This cannot be undone.",
+  "Choose export destination": "Choose export destination"
 }

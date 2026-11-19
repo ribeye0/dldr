@@ -4,7 +4,6 @@
   import type { Account, JobSnapshot } from "$lib/model/types";
   import {
     accountCredentialLabel,
-    accountEnabledLabel,
     accountLastSyncLabel,
     accountLoginLabel,
   } from "$lib/utils/accounts";
@@ -14,26 +13,20 @@
 
   let {
     account,
-    selected = false,
     statusLabel,
     statusTone = "idle",
     activeSyncJob = null,
-    onToggleEnabled,
     onSelect,
     onSync,
     onCancelSync,
-    onRemove,
   }: {
     account: Account;
-    selected?: boolean;
     statusLabel: string;
     statusTone?: AccountStatusTone;
     activeSyncJob?: JobSnapshot | null;
-    onToggleEnabled: (account: Account, enabled: boolean) => void;
     onSelect: (account: Account) => void;
     onSync: (account: Account) => void;
     onCancelSync: (account: Account) => void;
-    onRemove: (account: Account) => void;
   } = $props();
 </script>
 

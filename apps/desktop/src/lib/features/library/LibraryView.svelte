@@ -45,6 +45,8 @@
     onClearSelection,
     onReviewSelection,
     onDownloadSelected,
+    onDeleteSelected,
+    onExportSelected,
     detailLoadingWorkId = null,
     getActiveJob = () => null,
     onSearch,
@@ -106,6 +108,8 @@
     onClearSelection?: () => void;
     onReviewSelection?: () => void;
     onDownloadSelected?: () => void;
+    onDeleteSelected?: () => void;
+    onExportSelected?: () => void;
     detailLoadingWorkId?: string | null;
     getActiveJob?: (product: Product) => JobSnapshot | null;
     onSearch: () => void;
@@ -211,8 +215,8 @@
     <span>{rangeLabel}</span>
     {#if onSelectPage}
       <div class="dldr:flex dldr:flex-wrap dldr:gap-2">
-        <UiButton size="small" variant="secondary" disabled={loading || !products.some(canSelectProduct)} onclick={onSelectPage}>{$t("Select page")}</UiButton>
-        <UiButton size="small" variant="secondary" disabled={loading || !products.some((p) => selectedWorkIds.includes(p.workId))} onclick={onClearPage}>{$t("Deselect page")}</UiButton>
+        <UiButton variant="secondary" disabled={loading || !products.some((p) => canSelectProduct(p, downloadedOnly))} onclick={onSelectPage}>{$t("Select page")}</UiButton>
+        <UiButton variant="secondary" disabled={loading || !products.some((p) => selectedWorkIds.includes(p.workId))} onclick={onClearPage}>{$t("Deselect page")}</UiButton>
       </div>
     {/if}
     <Pagination page={pageNumber} {pageCount} {loading} label={downloadedOnly ? $t("Downloaded pages") : $t("Library pages")} onChange={onGoToPage} />
@@ -231,7 +235,8 @@
           activeJob={getActiveJob(product)}
           detailLoading={detailLoadingWorkId === product.workId}
           selected={selectedWorkIds.includes(product.workId)}
-          selectionDisabled={!canSelectProduct(product)}
+          selectionDisabled={!canSelectProduct(product, downloadedOnly)}
+          selectionForFiles={downloadedOnly}
           {onToggleSelection}
           {onOpenDetails}
           {onOpenDlsite}
@@ -255,14 +260,19 @@
     label={downloadedOnly ? $t("Downloaded pages") : $t("Library pages")} onChange={onGoToPage} />
 
   {#if selectedWorkIds.length > 0}
-    <div class="selection-bar" role="region" aria-label={$t("Download selection")}>
+    <div class="selection-bar" role="region" aria-label={downloadedOnly ? $t("Downloaded work selection") : $t("Download selection")}>
       <div><span aria-live="polite">{selectedWorkIds.length} {$t("selected across all pages")}</span>
         {#if selectedSizeLabel}<p class="dldr:mb-0 dldr:mt-1 dldr:text-xs dldr:text-ui-dim">{selectedSizeLabel}</p>{/if}
       </div>
       <div class="dldr:flex dldr:flex-wrap dldr:gap-2">
         <UiButton variant="secondary" responsiveWidth="auto" onclick={onReviewSelection}>{$t("Review selected")}</UiButton>
         <UiButton variant="secondary" responsiveWidth="auto" onclick={onClearSelection}>{$t("Clear selection")}</UiButton>
-        <UiButton responsiveWidth="auto" disabled={selectedDownloadDisabled} onclick={onDownloadSelected}>{$t("Download selected (")}{selectedWorkIds.length})</UiButton>
+        {#if downloadedOnly}
+          <UiButton variant="danger" responsiveWidth="auto" disabled={selectedDownloadDisabled} onclick={onDeleteSelected}>{$t("Delete selected files")}</UiButton>
+          <UiButton responsiveWidth="auto" disabled={selectedDownloadDisabled} onclick={onExportSelected}>{$t("Export selected folders")}</UiButton>
+        {:else}
+          <UiButton responsiveWidth="auto" disabled={selectedDownloadDisabled} onclick={onDownloadSelected}>{$t("Download selected (")}{selectedWorkIds.length})</UiButton>
+        {/if}
       </div>
     </div>
   {/if}

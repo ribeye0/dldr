@@ -1,6 +1,6 @@
 <script lang="ts">
   import LibraryView from "$lib/features/library/LibraryView.svelte";
-  import type { Product, ProductCreditField } from "$lib/model/types";
+  import type { Product } from "$lib/model/types";
 
   let {
     viewState = "populated",
@@ -93,9 +93,7 @@
   function productAction(prefix: string, product: Product) {
     action(`${prefix} ${product.workId}`);
   }
-  function copyCredit(field: ProductCreditField, workId: string) {
-    action(`Copy ${field.label} ${workId}`);
-  }
+
 </script>
 
 <main class="story-surface">

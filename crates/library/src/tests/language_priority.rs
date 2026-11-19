@@ -1,4 +1,5 @@
 use super::*;
+use crate::bulk::{BulkProductPages, BULK_DOWNLOAD_PAGE_LIMIT};
 use dldr_storage::{AppSettingsPatch, LanguagePriority};
 
 #[tokio::test]
@@ -121,5 +122,27 @@ async fn paginated_candidates_and_bulk_selection_keep_one_priority_snapshot() ->
         library.available_name_languages().await?,
         vec!["en_US", "ja_JP", "pt_BR"]
     );
+    Ok(())
+}
+
+#[test]
+fn cached_names_preserve_unknown_languages_and_unlabeled_sources() -> Result<()> {
+    let mut source = work("RJ000001", "作品", "制作元", "2026-01-01T00:00:00Z");
+    source
+        .name
+        .insert(Language::Unknown("pt_BR".into()), "Título".into());
+    source.maker.name.insert(Language::Korean, "제작자".into());
+    let cached = cached_work_from_api(source, "2026-10-19")?;
+    let names: Value = serde_json::from_str(&cached.title_json)?;
+    assert_eq!(names["ja_JP"], "作品");
+    assert_eq!(names["pt_BR"], "Título");
+    let makers: Value = serde_json::from_str(cached.maker_json.as_deref().unwrap())?;
+    assert_eq!(makers["ko_KR"], "제작자");
+    let public =
+        cached_work_from_public_api(public_work("RJ000002", "Public", "Maker"), "2026-10-19")?;
+    assert_eq!(public.title_json, r#"{"und":"Public"}"#);
+    assert_eq!(public.maker_json.as_deref(), Some(r#"{"und":"Maker"}"#));
+    let local = cached_work_from_local_folder("RJ000003", "Local folder", "2026-10-19")?;
+    assert_eq!(local.title_json, r#"{"und":"Local folder"}"#);
     Ok(())
 }

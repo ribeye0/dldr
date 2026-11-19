@@ -1,5 +1,6 @@
+import { RequestGeneration } from "$lib/utils/request-generation";
 import { describe, expect, it, vi } from "vitest";
-import { LibraryQueryController, RequestGeneration } from "./library-query-controller";
+import { LibraryQueryController } from "./library-query-controller";
 import type { ProductListRequest } from "$lib/api/tauri";
 import type { ProductListPage } from "$lib/model/types";
 

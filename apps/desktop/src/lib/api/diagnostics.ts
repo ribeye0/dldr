@@ -38,6 +38,7 @@ const allowedCommands = new Set([
   "start_bulk_work_download",
   "open_work_download",
   "delete_work_download",
+  "export_work_download",
   "mark_work_downloaded",
   "list_jobs",
   "cancel_job",

@@ -53,7 +53,8 @@ async function settled(page) {
     await page.getByRole('heading', { name: 'Downloaded', exact: true }).waitFor();
     await settled(page);
     assert.equal(await cards(page).count(), expected.length);
-    assert.equal(await page.locator('.product-card input[type=checkbox]').count(), 0);
+    assert.equal(await page.locator('.product-card input[type=checkbox]:enabled').count(), expected.length);
+    assert.equal(await page.locator('.product-card input[type=checkbox]:checked').count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Download Results', exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Sync', exact: true }).count(), 0);
     const titles = await cards(page).evaluateAll((items) => items.map((card) => card.querySelector('button[aria-label^="Details:"]').getAttribute('aria-label').replace('Details: ', '')).sort());

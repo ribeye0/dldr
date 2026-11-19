@@ -35,7 +35,7 @@
   let seekPreview = $state<number | null>(null);
   const position = $derived(seekPreview ?? player.seekTarget ?? s.position);
   const seekTrack = $derived(`${s.workId ?? ""}\0${s.trackId ?? ""}`);
-  $effect(() => { const key = seekTrack; seekPreview = null; });
+  $effect(() => { seekTrack; seekPreview = null; });
   function commitSeek() {
     if (seekPreview === null) return;
     const target = seekPreview;

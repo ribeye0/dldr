@@ -3,7 +3,7 @@ use crate::{dto::*, errors::*, progress::*, state::*, validation::*};
 use dldr_audit::AuditEvent;
 use dldr_jobs::{JobFailure, JobMetadata, JobProgress};
 use dldr_library::{
-    AccountSyncRequest, DlsitePublicMetadataSource, DlsiteSyncSource, LocalWorkImportRequest,
+    AccountSyncRequest, DlsitePublicMetadataSource, DlsiteSource, LocalWorkImportRequest,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -361,7 +361,7 @@ pub(crate) async fn start_account_sync(
                             .map_err(|error| {
                                 JobFailure::with_code("api_client", error.to_string())
                             })?;
-                    let source = DlsiteSyncSource::new(client.clone());
+                    let source = DlsiteSource::new(client.clone());
                     let metadata_source = DlsitePublicMetadataSource::new(client);
                     let progress_sink = JobSyncProgressSink {
                         context: context.clone(),

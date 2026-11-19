@@ -154,7 +154,6 @@ export function jobLabel(job: JobSnapshot, language: UiLocale = "en") {
 }
 
 export function activeJobDetail(job: JobSnapshot, language: UiLocale = "en") {
-  const translate = translator(language);
   if (job.kind === "workDownload") {
     return activeWorkDownloadDetail(job, language);
   }

@@ -4,14 +4,12 @@
   let {
     label = "Continue",
     variant = "primary",
-    size = "normal",
     disabled = false,
   }: {
     label?: string;
     variant?: "primary" | "secondary" | "danger";
-    size?: "normal" | "small";
     disabled?: boolean;
   } = $props();
 </script>
 
-<UiButton {variant} {size} {disabled}>{label}</UiButton>
+<UiButton {variant} {disabled}>{label}</UiButton>

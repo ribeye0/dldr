@@ -8,8 +8,8 @@ use crate::{
 use dldr_api::DlsiteClient;
 use dldr_download::{DownloadRateLimiter, UnpackPolicy};
 use dldr_library::{
-    download_progress::DownloadWorkPlan, AccountSyncRequest, CancellationToken, DlsiteSyncSource,
-    DlsiteWorkDownloadSource, WorkDownloadRequest,
+    download_progress::DownloadWorkPlan, AccountSyncRequest, CancellationToken, DlsiteSource,
+    WorkDownloadRequest,
 };
 use dldr_storage::{DownloadQueueEntry, ProductDetail, ProductListQuery};
 use futures_util::{stream, StreamExt};
@@ -239,7 +239,7 @@ async fn execute(
         CancellationToken::new(),
         |limiter| {
             Ok(
-                DlsiteWorkDownloadSource::new(DlsiteClient::new(Default::default())?)
+                DlsiteSource::new(DlsiteClient::new(Default::default())?)
                     .with_rate_limiter(limiter),
             )
         },
@@ -463,7 +463,7 @@ pub async fn sync(context: &Context, cli: &Cli, account: Option<&str>) -> Result
         if !cli.quiet {
             eprintln!("Syncing {}…", output::clean(&account.label));
         }
-        let source = DlsiteSyncSource::new(
+        let source = DlsiteSource::new(
             DlsiteClient::new(Default::default())
                 .map_err(|_| Error::new("Could not initialize the DLsite client."))?,
         );

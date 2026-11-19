@@ -104,13 +104,13 @@
 <section class="diagnostics" aria-label={$t("Diagnostics")}>
   <div class="actions">
     <strong>{$t("Diagnostics")}</strong>
-    <UiButton size="small" disabled={busy} onclick={save}
+    <UiButton disabled={busy} onclick={save}
       >{$t("Export diagnostics")}</UiButton
     >
-    <UiButton size="small" variant="secondary" onclick={copy}
+    <UiButton variant="secondary" onclick={copy}
       >{$t("Copy support summary")}</UiButton
     >
-    <UiButton size="small" variant="secondary" onclick={refresh}
+    <UiButton variant="secondary" onclick={refresh}
       >{$t("Refresh")}</UiButton
     >
   </div>
@@ -147,7 +147,7 @@
         2,
       )}</pre>{/if}
   {#if status}<p role="status">{status}</p>{/if}
-  {#if savedPath}<UiButton size="small" variant="secondary" onclick={copyPath}
+  {#if savedPath}<UiButton variant="secondary" onclick={copyPath}
       >{$t("Copy saved path")}</UiButton
     >{/if}
   {#if summary}<textarea

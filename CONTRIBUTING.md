@@ -22,6 +22,13 @@ Keep DLDR small, readable and easy to maintain.
   response bodies.
 - Put shared business logic in the Rust crates; keep Tauri and CLI adapters thin
   and frontend components focused on interaction and presentation.
+- Keep feature state and native requests in focused controllers with typed ports;
+  routes compose them. Reuse the request-generation guard for replaceable reads,
+  dispose listeners/timers, and resolve abandoned confirmations as cancelled.
+  Preserve live job updates when reconciling older list reads.
+- Remove unused code and obsolete component props instead of suppressing the unused
+  checks. Keep tests at real boundaries: request races, persistence, cancellation
+  and user flows. Avoid new abstractions that only forward one existing function.
 - Keep application code and configuration in `apps/desktop/` and `apps/cli/`,
   reusable Rust services in `crates/`, canonical shared data in `resources/`,
   tooling in `tools/` and guides in `docs/`. The root is for workspace manifests,

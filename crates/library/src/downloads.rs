@@ -1,6 +1,42 @@
-use super::*;
+use crate::auth;
+use crate::auth::acquire_login_lock;
+use crate::finalization;
+use crate::paths::remove_existing_download_path;
+use crate::serial::write_serial_information_file;
+use crate::{
+    now_string, unpack_policy_storage_value, Library, LibraryError, Result, WorkDownloadProgress,
+    WorkDownloadReport, WorkDownloadRequest, WorkDownloadSource,
+};
+use dldr_api::{ApiError, WorkId};
+use dldr_download::DownloadJobRequest;
+use dldr_storage::{
+    Account, StorageError, WorkDownloadState, WorkDownloadStatus, WorkDownloadUpdate,
+};
+use std::{path::Path, path::PathBuf, sync::Arc};
 
 impl Library {
+    async fn refresh_download_session<S: WorkDownloadSource + Sync>(
+        &self,
+        account: &Account,
+        request: &WorkDownloadRequest<'_>,
+        source: &S,
+    ) -> Result<()> {
+        request.check_cancelled()?;
+        request.emit(WorkDownloadProgress::LoggingIn);
+        tracing::info!(target: "dldr_diagnostic", phase = "loggingIn", kind = "download_session_refresh", attempt = 1, "Refreshing the download session");
+        self.authenticate_account_session(
+            account,
+            request.password,
+            request.two_factor_prompt,
+            request.cancellation_token,
+            source,
+            true,
+        )
+        .await?;
+        request.emit(WorkDownloadProgress::ResolvingPlan);
+        Ok(())
+    }
+
     pub(super) fn work_lock(&self, work_id: &str) -> Arc<tokio::sync::Mutex<()>> {
         self.work_locks
             .lock()
@@ -235,8 +271,21 @@ impl Library {
 
         request.check_cancelled()?;
         request.emit(WorkDownloadProgress::ResolvingPlan);
-        let plan =
-            auth::cancellable(source.download_plan(work_id), request.cancellation_token).await?;
+        let mut refreshed_session = false;
+        let mut plan = match auth::cancellable(
+            source.download_plan(work_id),
+            request.cancellation_token,
+        )
+        .await
+        {
+            Err(error) if download_needs_login(&error) => {
+                self.refresh_download_session(account, &request, source)
+                    .await?;
+                refreshed_session = true;
+                auth::cancellable(source.download_plan(work_id), request.cancellation_token).await?
+            }
+            result => result?,
+        };
 
         request.check_cancelled()?;
         let previous = self.storage.work_download_state(request.work_id).await?;
@@ -284,15 +333,36 @@ impl Library {
             target_root: request.download_root.to_path_buf(),
             unpack_policy: request.unpack_policy,
         };
-        let downloaded = source
-            .download_files(&job, &plan, &download_cancellation, &mut |progress| {
-                if request.is_cancelled() {
-                    download_cancellation.cancel();
-                }
+        let downloaded = loop {
+            let mut transfer_started = false;
+            let result = source
+                .download_files(&job, &plan, &download_cancellation, &mut |progress| {
+                    transfer_started |= progress.phase == dldr_download::DownloadPhase::Downloading;
+                    if request.is_cancelled() {
+                        download_cancellation.cancel();
+                    }
 
-                request.emit(WorkDownloadProgress::Download(progress));
-            })
-            .await?;
+                    request.emit(WorkDownloadProgress::Download(progress));
+                })
+                .await;
+            match result {
+                // All metadata probes run before any files are transferred. Retry
+                // that preflight once; never restart a partially transferred work.
+                Err(error)
+                    if !refreshed_session && !transfer_started && download_needs_login(&error) =>
+                {
+                    self.refresh_download_session(account, &request, source)
+                        .await?;
+                    refreshed_session = true;
+                    plan = auth::cancellable(
+                        source.download_plan(work_id),
+                        request.cancellation_token,
+                    )
+                    .await?;
+                }
+                result => break result?,
+            }
+        };
 
         request.check_cancelled()?;
         request.emit(WorkDownloadProgress::Finalizing);
@@ -412,5 +482,24 @@ impl Library {
             download_state: update.into(),
             warnings,
         })
+    }
+}
+
+fn download_needs_login(error: &LibraryError) -> bool {
+    match error {
+        LibraryError::Api(error)
+        | LibraryError::Download(dldr_download::DownloadError::Api(error)) => matches!(
+            error,
+            ApiError::NotAuthorized
+                | ApiError::DownloadUnavailable {
+                    reason: dldr_api::DownloadUnavailableReason::NotAuthorized,
+                    ..
+                }
+        ),
+        // Some download endpoints serve an HTML login/error page directly.
+        LibraryError::Download(dldr_download::DownloadError::InvalidDownloadResponse {
+            ..
+        }) => true,
+        _ => false,
     }
 }

@@ -899,5 +899,18 @@
   "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "新しいバージョンを確認し、ダウンロード後に DLDR を再起動します。アカウント、ライブラリ、ダウンロード済み作品は保持されます。",
   "Auto-follow playback": "再生位置に自動追従",
   "Turn off to browse the script freely.": "オフにすると台本を自由にスクロールできます。",
-  "Click the blank area of a work card to open the player.": "作品カードの余白をクリックすると、プレーヤーが開きます。"
+  "Click the blank area of a work card to open the player.": "作品カードの余白をクリックすると、プレーヤーが開きます。",
+  "Selected downloaded works ({0})": "選択したダウンロード済み作品（{0}）",
+  "Export copies each work folder to your chosen location and keeps the original files. Existing folders are never overwritten.": "各作品のフォルダーを指定先へコピーし、元のファイルは保持します。既存のフォルダーは上書きしません。",
+  "You can close this window. The operation will continue in the background.": "このウィンドウを閉じても、処理はバックグラウンドで続行します。",
+  "Deleting works: {0} / {1}": "作品を削除中：{0} / {1}",
+  "Exporting works: {0} / {1}": "作品をエクスポート中：{0} / {1}",
+  "{0} succeeded, {1} failed": "成功 {0} 件、失敗 {1} 件",
+  "Delete selected files": "選択したファイルを削除",
+  "Export selected folders": "選択したフォルダーをエクスポート",
+  "Downloaded work selection": "ダウンロード済み作品の選択",
+  "Select downloaded work; Shift-click to select a range": "ダウンロード済み作品を選択。Shift を押しながらクリックで範囲選択",
+  "Delete local files for {0} selected works?": "選択した {0} 件の作品のローカルファイルを削除しますか？",
+  "This permanently deletes the selected work folders and staging files. Library metadata and purchase records are kept. This cannot be undone.": "選択した作品のフォルダーと一時ファイルを完全に削除します。作品情報と購入記録は保持されます。この操作は元に戻せません。",
+  "Choose export destination": "エクスポート先を選択"
 }

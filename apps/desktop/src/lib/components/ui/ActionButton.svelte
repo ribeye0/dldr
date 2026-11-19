@@ -4,14 +4,12 @@
 
   type ButtonType = "button" | "submit" | "reset";
   type ButtonVariant = "primary" | "secondary" | "danger";
-  type ButtonSize = "normal" | "small";
   type ButtonResponsiveWidth = "fill" | "auto";
 
   let {
     children,
     type = "button",
     variant = "primary",
-    size = "normal",
     responsiveWidth = "fill",
     disabled = false,
     title,
@@ -23,7 +21,6 @@
     children?: Snippet;
     type?: ButtonType;
     variant?: ButtonVariant;
-    size?: ButtonSize;
     responsiveWidth?: ButtonResponsiveWidth;
     disabled?: boolean;
     title?: string;

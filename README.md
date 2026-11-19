@@ -25,12 +25,17 @@ Built with Rust, Tauri and Svelte. The GUI and CLI share the same library and se
 
 ## A closer look
 
-Browse work details, read the original product description and queue downloads from DLsite Play.
+Browse work details, manage downloads and listen with synchronized subtitles.
 
 | Work details | Product page content |
 | --- | --- |
 | See the circle, voice cast, genres and file size, with download actions in one place. | Expand **Product page content** to view the original description and images inside DLDR. |
 | [![Work details with metadata and download actions](docs/images/work-detail.webp)](docs/images/work-detail.webp) | [![Original DLsite product description and images displayed in work details](docs/images/product-page.webp)](docs/images/product-page.webp) |
+
+| Download progress | Audio player |
+| --- | --- |
+| Overall and per-work progress, transfer speeds and pause/resume controls. | Track controls and VTT subtitles in a synchronized script view, with optional auto-follow. |
+| [![Download panel showing overall progress, transfer speed and per-work controls](docs/images/download-progress.webp)](docs/images/download-progress.webp) | [![Expanded audio player with playback controls and highlighted VTT subtitles](docs/images/player.webp)](docs/images/player.webp) |
 
 **From DLsite Play to your download queue**
 
@@ -52,8 +57,8 @@ Choose a package from [Releases](https://github.com/ribeye0/dldr/releases/latest
 For example, on Linux:
 
 ```sh
-chmod +x DLDR_0.1.3_amd64.AppImage
-./DLDR_0.1.3_amd64.AppImage
+chmod +x DLDR_0.1.4_amd64.AppImage
+./DLDR_0.1.4_amd64.AppImage
 ```
 
 Use the version you downloaded. If FUSE is unavailable, add `--appimage-extract-and-run`.
@@ -114,6 +119,8 @@ In **Downloaded**, click a card's blank area to open the bottom-right player, th
 Subtitles are matched by filename: `foo.wav.vtt` pairs with `foo.wav`. You can also choose a VTT file from the player's subtitle list and adjust its timing offset. The current line is centered and highlighted in the script view. Turn off **Auto-follow playback** above the script to browse freely; your choice is remembered.
 
 The upper-right playlist icon toggles a work in your default playlist, even before downloading. Right-click to choose another playlist. Create and rename lists from **Playlists**.
+
+In **Downloaded**, select works across pages to manage them in bulk, including imported local works. **Export selected folders** copies each complete work folder to a chosen destination, keeping the originals and download status; existing folders are never overwritten. **Delete selected files** asks for confirmation before permanently deleting the selected local folders and staging files, keeping library metadata and purchase records. The dialog shows progress and any failed works.
 
 ### DLsite Play
 

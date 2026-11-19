@@ -5,8 +5,10 @@ import { formatBytes } from "$lib/utils/format";
 
 export const SELECTION_STORAGE_KEY = "dldr-selected-works-v1";
 
-export function canSelectProduct(product: Product) {
-  return product.owners.some((owner) => owner.accountId !== "__local__");
+export function canSelectProduct(product: Product, downloadedOnly = false) {
+  return downloadedOnly
+    ? product.download?.status === "downloaded" && Boolean(product.download.localPath?.trim())
+    : product.owners.some((owner) => owner.accountId !== "__local__");
 }
 
 export function selectedProduct(product: Product): SelectedProduct {
@@ -19,10 +21,10 @@ export function selectedProduct(product: Product): SelectedProduct {
   };
 }
 
-export function addProducts(selection: SelectedProduct[], products: Product[]) {
+export function addProducts(selection: SelectedProduct[], products: Product[], downloadedOnly = false) {
   const entries = new Map(selection.map((item) => [item.workId, item]));
   for (const product of products) {
-    if (canSelectProduct(product)) entries.set(product.workId, selectedProduct(product));
+    if (canSelectProduct(product, downloadedOnly)) entries.set(product.workId, selectedProduct(product));
   }
   return [...entries.values()];
 }
@@ -33,15 +35,16 @@ export function toggleProductSelection(
   visible: Product[],
   anchorId: string | null,
   range = false,
+  downloadedOnly = false,
 ) {
-  if (!canSelectProduct(product)) return selection;
+  if (!canSelectProduct(product, downloadedOnly)) return selection;
   const checked = !selection.some((item) => item.workId === product.workId);
   const anchorIndex = visible.findIndex((item) => item.workId === anchorId);
   const targetIndex = visible.findIndex((item) => item.workId === product.workId);
   const affected = range && anchorIndex >= 0 && targetIndex >= 0
     ? visible.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
     : [product];
-  if (checked) return addProducts(selection, affected);
+  if (checked) return addProducts(selection, affected, downloadedOnly);
   const removed = new Set(affected.map((item) => item.workId));
   return selection.filter((item) => !removed.has(item.workId));
 }

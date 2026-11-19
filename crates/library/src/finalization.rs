@@ -1,5 +1,20 @@
 //! Destination-side installation. SQL and job lifecycle stay with Library.
-use super::*;
+#[cfg(test)]
+use crate::metadata::cached_work_from_local_folder;
+use crate::paths::path_is_download_child_of_any_root;
+use crate::{detect_work_ids_in_text, LibraryError, Result};
+#[cfg(test)]
+use crate::{LocalWorkImportRequest, WorkDownloadMarkRequest, WorkDownloadRemovalRequest};
+use dldr_api::WorkId;
+#[cfg(test)]
+use dldr_storage::{
+    LocalWorkDownloadImport, Storage, WorkDownloadState, WorkDownloadStatus, WorkDownloadUpdate,
+};
+use std::{path::Path, path::PathBuf};
+#[cfg(test)]
+use std::{sync::Arc, time::Duration};
+use uuid::Uuid;
+
 use dldr_storage::DownloadFinalization;
 use std::io;
 
@@ -472,6 +487,7 @@ fn copy_tree(source: &Path, destination: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Library;
     use dldr_credentials::InMemoryCredentialStore;
 
     struct Fixture {

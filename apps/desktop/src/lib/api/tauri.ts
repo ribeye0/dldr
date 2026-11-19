@@ -153,9 +153,9 @@ export function openWorkDownload(workId: string) {
   return invoke<void>("open_work_download", { request: { workId } });
 }
 
-export function deleteWorkDownload(workId: string) {
+export function deleteWorkDownload(workId: string, completedOnly = false) {
   return invoke<ProductDownload>("delete_work_download", {
-    request: { workId },
+    request: { workId, completedOnly },
   });
 }
 
@@ -163,6 +163,10 @@ export function markWorkDownloaded(workId: string, localPath: string) {
   return invoke<ProductDownload>("mark_work_downloaded", {
     request: { workId, localPath },
   });
+}
+
+export function exportWorkDownload(workId: string, destinationRoot: string) {
+  return invoke<string>("export_work_download", { workId, destinationRoot });
 }
 
 export function listJobs() {

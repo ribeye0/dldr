@@ -1,4 +1,5 @@
-use super::*;
+use crate::{Library, Result};
+use dldr_storage::{ProductDetail, ProductFilterFacets, ProductListPage, ProductListQuery};
 
 impl Library {
     pub(super) async fn resolved_query(

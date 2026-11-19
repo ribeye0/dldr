@@ -80,7 +80,6 @@
     bind:label
     bind:loginName
     bind:password
-    syncingCount={visibleAccounts.filter((account) => activeJob(account.id)).length}
     syncAllDisabled={viewState !== "populated"}
     getActiveSyncJob={activeJob}
     getStatusLabel={statusLabel}

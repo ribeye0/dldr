@@ -7,8 +7,8 @@ use dldr_jobs::{JobFailure, JobMetadata};
 use dldr_library::download_progress::DownloadWorkPlan;
 use dldr_library::{
     BulkWorkDownloadPreviewRequest, BulkWorkDownloadRequest, DlsitePublicMetadataSource,
-    DlsiteWorkDownloadSource, LocalWorkImportRequest, WorkDownloadMarkRequest,
-    WorkDownloadRemovalRequest, WorkDownloadRequest,
+    DlsiteSource, LocalWorkImportRequest, WorkDownloadMarkRequest, WorkDownloadRemovalRequest,
+    WorkDownloadRequest,
 };
 use dldr_storage::WorkDownloadStatus;
 use serde_json::{json, Value};
@@ -250,8 +250,7 @@ pub(crate) async fn start_work_download_inner(
                             .map_err(|error| {
                                 JobFailure::with_code("api_client", error.to_string())
                             })?;
-                    let source =
-                        DlsiteWorkDownloadSource::new(client).with_rate_limiter(rate_limiter);
+                    let source = DlsiteSource::new(client).with_rate_limiter(rate_limiter);
                     let progress_sink =
                         JobWorkDownloadProgressSink::new(context.clone(), progress_plan);
                     let two_factor_prompt = JobTwoFactorPrompt::new(
@@ -530,7 +529,7 @@ pub(crate) async fn start_bulk_work_download(
                     },
                     max_concurrent_works,
                     || dldr_api::DlsiteClient::new(dldr_api::DlsiteClientConfig::default())
-                        .map(|client| DlsiteWorkDownloadSource::new(client).with_rate_limiter(rate_limiter.clone())).map_err(Into::into),
+                        .map(|client| DlsiteSource::new(client).with_rate_limiter(rate_limiter.clone())).map_err(Into::into),
                 )
                 .await
                 .map_err(|error| {
@@ -718,7 +717,7 @@ pub(crate) async fn preview_bulk_work_download(
                             return Err(JobFailure::with_code("api_client", message));
                         }
                     };
-                    let source = DlsiteWorkDownloadSource::new(client);
+                    let source = DlsiteSource::new(client);
                     let progress_sink = JobBulkWorkDownloadPreviewProgressSink {
                         context: context.clone(),
                     };
@@ -916,6 +915,7 @@ pub(crate) async fn open_work_download(
 pub(crate) async fn delete_work_download(
     app: AppHandle,
     state: State<'_, AppState>,
+    player: State<'_, dldr_player::Player>,
     request: DeleteWorkDownloadRequest,
 ) -> Result<WorkDownloadStateDto, String> {
     let _admission = state.mutation_lock.read().await;
@@ -984,14 +984,22 @@ pub(crate) async fn delete_work_download(
                 }
             };
 
-            let result = state
-                .library
-                .remove_work_download(WorkDownloadRemovalRequest::new(
-                    &work_id,
-                    &library_root,
-                    &download_root,
-                ))
-                .await;
+            if player.snapshot().work_id.as_deref() == Some(&work_id) {
+                let player = player.inner().clone();
+                let id = work_id.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    player.control(id, dldr_player::Control::Stop)
+                })
+                .await
+                .map_err(command_error)?
+                .map_err(command_error)?;
+            }
+            let mut removal =
+                WorkDownloadRemovalRequest::new(&work_id, &library_root, &download_root);
+            if request.completed_only {
+                removal = removal.completed_only();
+            }
+            let result = state.library.remove_work_download(removal).await;
 
             match result {
                 Ok(state_after_delete) => {
@@ -1013,6 +1021,52 @@ pub(crate) async fn delete_work_download(
                         )
                         .with_error(Some("library"), message.clone())
                         .with_details(json!({ "workId": work_id })),
+                    )
+                    .await;
+                    Err(message)
+                }
+            }
+        })
+        .await
+}
+
+#[tauri::command]
+pub(crate) async fn export_work_download(
+    state: State<'_, AppState>,
+    work_id: String,
+    destination_root: String,
+) -> Result<String, String> {
+    let _admission = state.mutation_lock.read().await;
+    let operation = state.audit.operation("export_work_download");
+    operation
+        .command(async {
+            let work_id = normalize_required_id(work_id)?;
+            let settings = state.storage.app_settings().await.map_err(command_error)?;
+            let library_root = required_library_root(&settings)?;
+            let result = state
+                .library
+                .export_work_download(&work_id, &library_root, &PathBuf::from(destination_root))
+                .await;
+            match result {
+                Ok(path) => {
+                    record_audit(
+                        &state.audit,
+                        AuditEvent::succeeded("work.download.export", "Exported downloaded work")
+                            .with_details(json!({"workId": work_id, "path": path})),
+                    )
+                    .await;
+                    Ok(path.to_string_lossy().into_owned())
+                }
+                Err(error) => {
+                    let message = command_error(error);
+                    record_audit(
+                        &state.audit,
+                        AuditEvent::failed(
+                            "work.download.export",
+                            "Failed to export downloaded work",
+                        )
+                        .with_error(Some("library"), message.clone())
+                        .with_details(json!({"workId": work_id})),
                     )
                     .await;
                     Err(message)

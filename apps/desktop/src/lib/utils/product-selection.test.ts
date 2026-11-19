@@ -14,6 +14,17 @@ function work(id: string, local = false): Product {
 const a = work("RJ000001"), b = work("RJ000002"), c = work("RJ000003");
 
 describe("download selection", () => {
+  it("selects completed local-only works in the downloaded gallery and keeps cross-page ranges", () => {
+    const local = { ...work("RJ000004", true), download: { status: "downloaded", localPath: "/library/RJ000004" } } as Product;
+    const owned = { ...a, download: { status: "downloaded", localPath: "/library/RJ000001" } } as Product;
+    const incomplete = { ...b, download: { status: "downloading", localPath: null } } as Product;
+    expect(addProducts([], [local, owned, incomplete], true).map(p => p.workId)).toEqual([local.workId, owned.workId]);
+    const hidden = selectedProduct(c);
+    const selection = toggleProductSelection([hidden], owned, [local, incomplete, owned], local.workId, true, true);
+    expect(selection.map(p => p.workId)).toEqual([c.workId, local.workId, owned.workId]);
+    expect(addProducts([], [local])).toEqual([]);
+  });
+
   it("keeps earlier pages, deduplicates, and excludes local-only works", () => {
     const firstPage = addProducts([], [a, b]);
     const secondPage = addProducts(firstPage, [b, c, work("RJ000004", true)]);

@@ -803,6 +803,8 @@ pub(crate) struct OpenWorkDownloadRequest {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeleteWorkDownloadRequest {
     pub(crate) work_id: String,
+    #[serde(default)]
+    pub(crate) completed_only: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

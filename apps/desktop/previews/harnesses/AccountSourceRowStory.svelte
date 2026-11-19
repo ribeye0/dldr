@@ -24,15 +24,12 @@
 <main class="story-surface">
   <AccountSourceRow
     {account}
-    selected={rowState === "selected"}
     statusLabel={rowState === "syncing" ? "Loading 120 works" : rowState === "disabled" ? "Disabled" : "Synced"}
     statusTone={rowState === "syncing" ? "syncing" : rowState === "disabled" ? "disabled" : "synced"}
     activeSyncJob={rowState === "syncing" ? accountSyncJob : null}
-    onToggleEnabled={(item, enabled) => action(`${enabled ? "Enable" : "Disable"} ${item.id}`)}
     onSelect={(item) => action(`Select ${item.id}`)}
     onSync={(item) => action(`Sync ${item.id}`)}
     onCancelSync={(item) => action(`Cancel ${item.id}`)}
-    onRemove={(item) => action(`Remove ${item.id}`)}
   />
   <p aria-live="polite">{lastAction}</p>
 </main>

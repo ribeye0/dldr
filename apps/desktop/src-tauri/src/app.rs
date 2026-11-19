@@ -285,6 +285,7 @@ pub fn run() {
             commands::accounts::cancel_two_factor,
             commands::downloads::open_work_download,
             commands::downloads::delete_work_download,
+            commands::downloads::export_work_download,
             commands::downloads::mark_work_downloaded,
             commands::downloads::scan_local_work_downloads,
             commands::jobs::list_jobs,

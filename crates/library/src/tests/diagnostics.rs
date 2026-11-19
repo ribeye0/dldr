@@ -1,3 +1,4 @@
+use super::*;
 use crate::*;
 #[test]
 fn wrapped_download_and_archive_causes_survive_persistence_and_export() {
@@ -61,4 +62,85 @@ fn wrapped_download_and_archive_causes_survive_persistence_and_export() {
         assert_eq!(events[5].details["archiveErrorKind"], "zip_io");
         assert_eq!(events[5].details["osCode"], 13);
     }
+}
+
+#[test]
+fn html_download_failures_keep_a_safe_reason_and_actionable_hint() {
+    use dldr_audit::{AuditEvent, AuditLogger};
+    use dldr_download::{DownloadError, InvalidDownloadResponseReason};
+    let directory = tempfile::tempdir().unwrap();
+    let logger = AuditLogger::new(directory.path()).unwrap();
+    logger.record_now(AuditEvent::failed("work.download", "PRIVATE-MESSAGE").with_details(
+        serde_json::json!({"errorCode":"download", "errorDetails": LibraryError::Download(DownloadError::InvalidDownloadResponse {
+            reason: InvalidDownloadResponseReason::HtmlContentType {content_type:"text/html; PRIVATE-HEADER".into()},
+        }).support_details()})
+    ));
+    let event = logger
+        .events_for_run(None, 500, None)
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert_eq!(
+        event.details["errorDetails"]["responseKind"],
+        "html_content_type"
+    );
+    assert!(event.error_message.unwrap().contains("HTML page"));
+    assert!(event.hint.unwrap().contains("Sign in again"));
+    assert!(!event.details.to_string().contains("PRIVATE-"));
+}
+
+#[test]
+fn support_details_preserve_safe_api_failure_context() {
+    let error = LibraryError::Api(ApiError::DownloadUnknownRedirect {
+        work_id: WorkId::from("RJ123456"),
+        location: Url::parse("https://download.dlsite.com/get/=/file/RJ123456.zip?token=secret")
+            .unwrap(),
+    });
+
+    let details = error.support_details();
+
+    assert_eq!(error.failure_code(), "api");
+    assert!(error
+        .support_message()
+        .contains("unknown download redirect for RJ123456"));
+    assert_eq!(details["failureKind"], "api");
+    assert_eq!(details["apiErrorKind"], "download_unknown_redirect");
+    assert_eq!(details["workId"], "RJ123456");
+    assert_eq!(
+        details["location"],
+        "https://download.dlsite.com/<download-url-redacted>"
+    );
+    assert!(!details.to_string().contains("secret"));
+}
+
+#[test]
+fn support_details_preserve_download_api_failure_context() {
+    let error = LibraryError::Download(dldr_download::DownloadError::Api(ApiError::NotAuthorized));
+
+    let details = error.support_details();
+
+    assert_eq!(error.failure_code(), "download");
+    assert!(error
+        .support_message()
+        .contains("DLsite session is not authorized"));
+    assert_eq!(details["failureKind"], "api");
+    assert_eq!(details["downloadErrorKind"], "api");
+    assert_eq!(details["apiErrorKind"], "not_authorized");
+}
+
+#[test]
+fn support_body_snippets_redact_urls_and_serial_material() {
+    let html = r#"<a href="https://download.dlsite.com/get/secret?token=value">download</a>"#;
+
+    let snippet = safe_body_snippet_for_log(html).unwrap();
+
+    assert!(snippet.contains("[redacted-url]"));
+    assert!(!snippet.contains("download.dlsite.com"));
+    assert!(!snippet.contains("token=value"));
+
+    let serial_snippet = safe_body_snippet_for_log("serial number: ABCD-1234").unwrap();
+    assert_eq!(
+        serial_snippet,
+        "[redacted because response may contain serial information]"
+    );
 }

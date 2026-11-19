@@ -1,4 +1,6 @@
-use super::*;
+use crate::models::WorkDownloadUpdate;
+use crate::{Result, Storage, StorageError};
+use sqlx::Row;
 
 /// Bounded recovery intent, not durable generic job history.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -72,10 +72,16 @@
     padding: 8px 12px 18px;
     border: 0;
     background: transparent;
+    height: max-content;
+    min-height: 0;
     max-height: min(380px, calc(100dvh - var(--toast-top, 56px) - 16px));
     overflow-y: auto;
     z-index: 120;
     display: grid;
+    /* Popover rows must follow their text height, including inside a tall dialog. */
+    grid-auto-rows: max-content;
+    align-content: start;
+    align-items: start;
     gap: 8px;
     width: min(464px, calc(100vw - 12px));
     box-sizing: border-box;
@@ -91,6 +97,7 @@
     gap: 10px;
     align-items: center;
     min-height: 48px;
+    height: max-content;
     border: 1px solid var(--border-strong);
     border-radius: 8px;
     background: var(--panel-raised);

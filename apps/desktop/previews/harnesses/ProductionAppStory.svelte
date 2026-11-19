@@ -32,6 +32,8 @@
   let ready = $state(false);
   onMount(() => {
     const fixture = makeFixture("long");
+    const localFiles = new URLSearchParams(location.search).has("localFiles");
+    const exportedWorks = new Set<string>();
     const setup = new URLSearchParams(location.search).has("setup");
     const setupAccountsKey = "dldr-story-setup-accounts";
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -42,6 +44,9 @@
         title: batch ? `${p.title} · Collection ${batch + 1}` : p.title,
       })),
     ).flat();
+    if (localFiles) products = products.map(product => ({ ...product, download: {
+      ...product.download, status: "downloaded", localPath: `/tmp/dlsite-library/${product.workId}`,
+    } }));
     // Opt-in regression fixture: Play omitted credits, public metadata has two actors.
     const missingCredits = new URLSearchParams(location.search).has("missingCredits");
     if (missingCredits) {
@@ -67,7 +72,7 @@
     const saveSetupAccounts = () => { if (setup) sessionStorage.setItem(setupAccountsKey, JSON.stringify(accounts)); };
     const catalog = products;
     if (setup && !accounts.some(account => account.lastSyncAt)) products = [];
-    let jobs = (setup ? [] : fixture.jobs).map((j) => ({
+    let jobs = (setup || localFiles ? [] : fixture.jobs).map((j) => ({
       ...j,
       title:
         j.kind === "accountSync" ? `Sync ${j.metadata.accountId}` : j.title,
@@ -176,7 +181,7 @@
       {id:"MP3/01. はじまり.mp3",name:"01. はじまり.mp3",group:"MP3",format:"MP3",size:8*1024**2},
     ];
     mockIPC(
-      (command, payload) => {
+      async (command, payload) => {
         const args = payload as Record<string, unknown>;
         if (command === "report_frontend_failure") return;
         if (command === "list_playlists") return structuredClone(playlists);
@@ -200,6 +205,21 @@
           return structuredClone({playlists,playlistId});
         }
         if (command === "set_native_header_theme") return;
+        if (command === "export_work_download") {
+          const id = String(args.workId);
+          await new Promise(resolve => setTimeout(resolve, 80));
+          if (exportedWorks.has(id)) throw new Error("Destination folder already exists");
+          exportedWorks.add(id);
+          return `${args.destinationRoot}/${id}`;
+        }
+        if (command === "delete_work_download") {
+          const { workId } = args.request as { workId: string };
+          const product = products.find(product => product.workId === workId);
+          if (!product) throw new Error("Work not found");
+          await new Promise(resolve => setTimeout(resolve, 80));
+          product.download = { ...product.download, status: "notDownloaded", localPath: null, stagingPath: null };
+          return structuredClone(product.download);
+        }
         if (command === "player_snapshot") return structuredClone(playerState);
         if (command === "open_player") {
           const request = args.request as {workId:string};
@@ -448,7 +468,7 @@
         if (command === "export_diagnostics")
           return "/tmp/dlsite-diagnostics.zip";
         if (command === "save_product_cover") return true;
-        if (command === "plugin:dialog|open") return setup ? "/tmp/中文 日本語 Downloads/dldr" : reliability ? "/tmp/story-library-backup.json" : null;
+        if (command === "plugin:dialog|open") return localFiles ? "/tmp/export 日本語" : setup ? "/tmp/中文 日本語 Downloads/dldr" : reliability ? "/tmp/story-library-backup.json" : null;
         if (command === "check_app_update") return { kind:"appImage", release:null };
         if (
           [

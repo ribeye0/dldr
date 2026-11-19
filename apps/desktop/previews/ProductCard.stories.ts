@@ -82,11 +82,8 @@ const meta = {
   parameters: { layout: "fullscreen" },
   args: {
     product: ownedProduct,
-    downloadLabel: "Download",
-    downloadTitle: "Download this work",
     downloadDisabled: false,
     detailLoading: false,
-    menuOpen: false,
   },
 } satisfies Meta<typeof ProductCardStory>;
 
@@ -114,8 +111,6 @@ export const JapaneseCredits: Story = {
 export const LocalOnly: Story = {
   args: {
     product: localProduct,
-    downloadLabel: "Open",
-    downloadTitle: "Open /Library/RJ01234567",
   },
 };
 
@@ -131,8 +126,6 @@ export const Downloaded: Story = {
         bytesTotal: 482_000_000,
       },
     },
-    downloadLabel: "Open",
-    downloadTitle: "Open /Library/RJ01553954",
   },
 };
 
@@ -147,8 +140,6 @@ export const Downloading: Story = {
         bytesTotal: 482_000_000,
       },
     },
-    downloadLabel: "Downloading",
-    downloadTitle: "Downloading",
     downloadDisabled: true,
   },
 };

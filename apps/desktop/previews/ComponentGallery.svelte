@@ -48,7 +48,7 @@
       <UiButton>Sync library</UiButton>
       <UiButton variant="secondary">Reload</UiButton>
       <UiButton variant="danger">Delete local files</UiButton>
-      <UiButton size="small" variant="secondary">Copy ID</UiButton>
+      <UiButton variant="secondary">Copy ID</UiButton>
       <UiButton disabled>Downloading</UiButton>
     </div>
   </section>

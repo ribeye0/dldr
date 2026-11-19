@@ -1,4 +1,9 @@
-use super::*;
+use crate::{BulkWorkDownloadReport, MAX_PARALLEL_WORK_DOWNLOADS};
+use dldr_api::ApiError;
+use dldr_credentials::CredentialsError;
+use dldr_storage::StorageError;
+use serde_json::{json, Map, Value};
+use std::path::PathBuf;
 
 #[derive(Debug, thiserror::Error)]
 pub enum LibraryError {
@@ -530,6 +535,10 @@ pub(super) fn download_error_support_details(error: &dldr_download::DownloadErro
         dldr_download::DownloadError::InvalidDownloadResponse { reason } => json!({
             "failureKind": "download",
             "downloadErrorKind": "invalid_response",
+            "responseKind": match reason {
+                dldr_download::InvalidDownloadResponseReason::HtmlContentType { .. } => "html_content_type",
+                dldr_download::InvalidDownloadResponseReason::HtmlDocumentBody => "html_document_body",
+            },
             "reason": reason.to_string(),
         }),
         dldr_download::DownloadError::FileNameUnknown { file_index } => json!({

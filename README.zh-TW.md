@@ -25,12 +25,17 @@
 
 ## 功能展示
 
-從查看作品資訊、閱讀商品介紹，到從 DLsite Play 加入下載佇列，一次看懂使用流程。
+查看作品資訊與商品介紹、管理下載，並搭配台本聆聽。
 
 | 作品詳細資訊 | 商品頁內容 |
 | --- | --- |
 | 集中查看社團、聲優、分類與檔案大小，並直接選擇下載方式。 | 展開「商品頁內容」，在 DLDR 內閱讀原始作品介紹與圖片。 |
 | [![作品詳細資訊，顯示作品資料與下載操作](docs/images/work-detail.webp)](docs/images/work-detail.webp) | [![在作品詳細資訊內展開 DLsite 商品介紹與圖片](docs/images/product-page.webp)](docs/images/product-page.webp) |
+
+| 下載進度 | 音訊播放器 |
+| --- | --- |
+| 查看整體與各作品進度、即時速率，隨時暫停或續傳。 | 切換音軌並搭配 VTT 字幕台本聆聽，也可關閉自動跟隨，自由翻閱。 |
+| [![下載面板，顯示整體進度、下載速率與各作品的操作](docs/images/download-progress.webp)](docs/images/download-progress.webp) | [![展開的音訊播放器，顯示播放控制與高亮的 VTT 字幕](docs/images/player.webp)](docs/images/player.webp) |
 
 **從 DLsite Play 直接加入下載**
 
@@ -52,8 +57,8 @@
 Linux 啟動範例：
 
 ```sh
-chmod +x DLDR_0.1.3_amd64.AppImage
-./DLDR_0.1.3_amd64.AppImage
+chmod +x DLDR_0.1.4_amd64.AppImage
+./DLDR_0.1.4_amd64.AppImage
 ```
 
 請使用實際下載的版本檔名。若系統無法使用 FUSE，可加上 `--appimage-extract-and-run` 啟動。
@@ -114,6 +119,8 @@ Windows 版本尚未簽署；免安裝版需要 WebView2，安裝版會在缺少
 字幕會依檔名自動配對，例如 `foo.wav` 對應 `foo.wav.vtt`。也可在播放器的字幕清單手動選擇，並調整時間偏移。台本會將正在播放的字幕置中並高亮。關閉台本上方的「自動跟隨播放」即可自由翻閱，程式會記住你的選擇。
 
 卡片右上角的播放清單圖示，可將作品加入或移出預設清單，未下載的作品也能收藏；按右鍵可選擇其他清單。到左側「播放清單」建立或重新命名清單。
+
+在「已下載」勾選作品後，可跨頁選取並批量管理，匯入的本機作品也可選取。「匯出所選資料夾」會完整複製各作品資料夾到指定目的地，保留原始檔案與下載狀態；同名資料夾不會覆寫。「刪除所選檔案」需再次確認，會永久刪除所選作品的本機資料夾與暫存檔，保留作品資訊與購買紀錄。處理視窗會顯示進度與失敗項目。
 
 ### DLsite Play
 

@@ -7,10 +7,10 @@ Rust services for its GUI and CLI.
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/desktop/src/routes/` | Application composition and page state |
+| `apps/desktop/src/routes/` | Application composition, navigation and cross-feature actions |
 | `apps/desktop/src/lib/features/` | Library, accounts, downloads, player and settings views |
 | `apps/desktop/src/lib/components/` | Shared interface components |
-| `apps/desktop/src/lib/controllers/` | Frontend request, queue and playback coordination |
+| `apps/desktop/src/lib/controllers/` | Feature state, request lifecycles, queue and playback coordination |
 | `apps/desktop/src/lib/api/` | Typed frontend/native boundary |
 | `apps/desktop/src/lib/i18n/`, `apps/desktop/src/lib/styles/` | Four interface languages and shared theme roles |
 | `apps/desktop/src-tauri/` | Native commands, events, windows and desktop integration |
@@ -139,16 +139,44 @@ in child modules. Package names use the `dldr-` prefix; Rust imports use `dldr_`
 - `apps/desktop/src-tauri/src/commands/` groups adapters by accounts, library, downloads, jobs,
   settings, player, playlists and desktop actions. `errors.rs` translates typed
   failures, and `progress.rs` bridges service progress to desktop jobs.
-- `crates/library/src/` separates account synchronization, product queries, single-work
-  transfers, batch planning, local imports, metadata conversion and error reporting.
-- `crates/storage/src/models.rs` contains stored/query models, `error.rs` contains typed
-  diagnostics, `transaction.rs` owns writes, and accounts, products and settings
-  have separate query modules. Migrations remain in the storage crate. Unit-test
-  suites live in `src/tests/`.
+- `crates/api/src/client/` groups authentication, catalogue requests, downloads and shared
+  response decoding. `client.rs` owns the HTTP client and sanitized network diagnostics.
+- `crates/library/src/contracts.rs` defines service requests, results and progress;
+  `sources.rs` implements the DLsite ports. Sync and downloads share `DlsiteSource`
+  and its authentication implementation. Services remain in feature modules; serial
+  sidecars, root-checked paths and work-ID parsing have separate owners.
+- `crates/storage/src/models.rs` defines stored/query models; `transaction.rs` owns
+  writes. `product_query.rs` holds common SQL predicates, `product_metadata.rs` projects
+  cached JSON, and `rows.rs` checks database values. Account, product, download and
+  settings methods live in their feature modules. Migrations remain in the storage
+  crate; regression suites live in `src/tests/`.
 
 Split modules along responsibilities, not arbitrary line counts. Avoid creating
 new crates or layers solely to move files; GUI and CLI should continue sharing the
 same tested services.
+
+## Frontend state and request lifecycles
+
+The route composes controllers instead of owning every feature's mutable state.
+`GalleryController` owns filters, pagination and separate Library/Downloaded query
+snapshots. Selection stays independent of those queries. Settings and account
+controllers own their drafts and native calls; notification and decision controllers
+own timers and pending confirmations. Controllers accept small typed ports for tests,
+with the native implementation as the default. No service locator or global event bus
+is needed.
+
+Use `RequestGeneration` when only the newest read may publish state. Invalidate on
+scope changes and disposal, including error/loading callbacks. Settings invalidate
+localized library projections immediately after saving a changed title order. Job
+list reads preserve live events received while the read was pending; later reads can
+still remove cleared jobs. Dispose controllers and settle pending confirmations on
+unmount. UI disposal stops publishing results; it does not cancel native downloads.
+
+`pnpm check` rejects unused locals and parameters in application code and previews.
+Keep preview props aligned with the shipped component API. Validate with `pnpm check`,
+`pnpm test` and `cargo test --locked --workspace`; use the relevant isolated browser
+checks under `tools/qa/` for changes to user flows. These checks do not require a real
+account or purchased media.
 
 ## Logs and troubleshooting
 

@@ -1,4 +1,19 @@
-use super::*;
+use crate::finalization;
+use crate::metadata::{cached_work_from_local_folder, cached_work_from_public_api};
+use crate::paths::{
+    canonicalize_existing_directory, path_is_download_child_of_any_root,
+    remove_download_path_from_state,
+};
+use crate::{
+    detect_work_ids_in_text, now_string, Library, LibraryError, LocalWorkImportItem,
+    LocalWorkImportReport, LocalWorkImportRequest, LocalWorkMetadataSource, Result,
+    WorkDownloadMarkRequest, WorkDownloadRemovalRequest,
+};
+use dldr_api::WorkId;
+use dldr_storage::{
+    CachedWork, LocalWorkDownloadImport, WorkDownloadState, WorkDownloadStatus, WorkDownloadUpdate,
+};
+use std::{collections::BTreeMap, collections::BTreeSet, path::PathBuf};
 
 impl Library {
     pub async fn remove_work_download(
@@ -6,7 +21,16 @@ impl Library {
         request: WorkDownloadRemovalRequest<'_>,
     ) -> Result<WorkDownloadState> {
         let lock = self.work_lock(request.work_id);
-        let _guard = lock.lock().await;
+        let _guard = if request.completed_only {
+            lock.try_lock().map_err(|_| {
+                LibraryError::RecoveryRequired(format!(
+                    "Work {} is busy; try again later",
+                    request.work_id
+                ))
+            })?
+        } else {
+            lock.lock().await
+        };
         self.recover_download_inner(
             request.work_id,
             &[request.library_root, request.download_root],
@@ -14,6 +38,12 @@ impl Library {
         )
         .await?;
         let state = self.storage.work_download_state(request.work_id).await?;
+        if request.completed_only && state.status != WorkDownloadStatus::Downloaded {
+            return Err(LibraryError::RecoveryRequired(format!(
+                "Work {} is no longer downloaded",
+                request.work_id
+            )));
+        }
         let allowed_roots = [request.library_root, request.download_root];
 
         remove_download_path_from_state(state.local_path.as_deref(), &allowed_roots).await?;

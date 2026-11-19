@@ -1,5 +1,9 @@
 //! Search syntax is enforced here so list, facets and bulk selection agree.
-use super::*;
+use crate::genres;
+use crate::names::push_valid_name_map;
+use crate::product_query::{push_text_filter, push_voice_filter};
+use crate::{Result, StorageError};
+use sqlx::{QueryBuilder, Sqlite};
 
 const MAX_QUERY_CHARS: usize = 4096;
 const MAX_TERMS: usize = 64;

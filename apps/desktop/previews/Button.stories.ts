@@ -8,12 +8,10 @@ const meta = {
   args: {
     label: "Sync library",
     variant: "primary",
-    size: "normal",
     disabled: false,
   },
   argTypes: {
     variant: { control: "select", options: ["primary", "secondary", "danger"] },
-    size: { control: "select", options: ["normal", "small"] },
   },
 } satisfies Meta<typeof ButtonStory>;
 
@@ -28,10 +26,6 @@ export const Secondary: Story = {
 
 export const Danger: Story = {
   args: { label: "Delete local files", variant: "danger" },
-};
-
-export const Compact: Story = {
-  args: { label: "Copy ID", variant: "secondary", size: "small" },
 };
 
 export const Disabled: Story = {

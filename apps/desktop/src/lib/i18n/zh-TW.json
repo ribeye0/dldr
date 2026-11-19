@@ -899,5 +899,18 @@
   "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "檢查新版本，下載後重新啟動 DLDR。帳號、作品庫與已下載作品都會保留。",
   "Auto-follow playback": "自動跟隨播放",
   "Turn off to browse the script freely.": "關閉後可自由翻閱台本。",
-  "Click the blank area of a work card to open the player.": "點擊作品卡片的空白處，即可開啟播放器。"
+  "Click the blank area of a work card to open the player.": "點擊作品卡片的空白處，即可開啟播放器。",
+  "Selected downloaded works ({0})": "已選取的已下載作品（{0}）",
+  "Export copies each work folder to your chosen location and keeps the original files. Existing folders are never overwritten.": "匯出會將各作品資料夾複製到指定位置，保留原始檔案，不會覆寫既有資料夾。",
+  "You can close this window. The operation will continue in the background.": "你可以關閉此視窗，操作會繼續在背景執行。",
+  "Deleting works: {0} / {1}": "正在刪除作品：{0} / {1}",
+  "Exporting works: {0} / {1}": "正在匯出作品：{0} / {1}",
+  "{0} succeeded, {1} failed": "成功 {0} 部，失敗 {1} 部",
+  "Delete selected files": "刪除所選檔案",
+  "Export selected folders": "匯出所選資料夾",
+  "Downloaded work selection": "已下載作品選取",
+  "Select downloaded work; Shift-click to select a range": "選取已下載作品；按住 Shift 點擊可選取範圍",
+  "Delete local files for {0} selected works?": "刪除所選 {0} 部作品的本機檔案？",
+  "This permanently deletes the selected work folders and staging files. Library metadata and purchase records are kept. This cannot be undone.": "這會永久刪除所選作品的資料夾與暫存檔，保留作品資訊與購買紀錄。此操作無法復原。",
+  "Choose export destination": "選擇匯出目的地"
 }

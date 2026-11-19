@@ -11,7 +11,7 @@ library or graphics driver portable.
 The native Arch package includes both GUI and CLI and uses system libraries:
 
 ```sh
-sudo pacman -U dldr-0.1.3-1-x86_64.pkg.tar.zst
+sudo pacman -U dldr-0.1.4-1-x86_64.pkg.tar.zst
 dldr-gui
 dldr --help
 ```
@@ -22,8 +22,8 @@ AppImage. Package removal leaves your profile and downloaded works intact.
 ## Start the GUI
 
 ```sh
-chmod +x DLDR_0.1.3_amd64.AppImage
-./DLDR_0.1.3_amd64.AppImage
+chmod +x DLDR_0.1.4_amd64.AppImage
+./DLDR_0.1.4_amd64.AppImage
 ```
 
 The GUI does not need Node.js, pnpm or Rust. libmpv, libarchive and the media dependencies
@@ -31,7 +31,7 @@ are packaged for the local player and official WebView. The host still provides
 its desktop, graphics drivers and audio service. If FUSE is unavailable, try:
 
 ```sh
-./DLDR_0.1.3_amd64.AppImage --appimage-extract-and-run
+./DLDR_0.1.4_amd64.AppImage --appimage-extract-and-run
 ```
 
 Open Settings → Download settings to choose the library and temporary folders;
@@ -43,7 +43,7 @@ status opens download progress. Downloads never start merely by opening DLDR.
 The standalone CLI archive is a developer build artifact, not a regular release
 attachment. Build it with `bash tools/release/build-linux.sh` or build just the CLI
 with `cargo build --release -p dldr-cli`. If using the generated archive, extract
-`dldr_0.1.3_linux_x86_64.tar.gz` into its own folder. Either run
+`dldr_0.1.4_linux_x86_64.tar.gz` into its own folder. Either run
 `./dldr` there, or install the executable on your PATH:
 
 ```sh
@@ -62,7 +62,7 @@ status can coexist. See `dldr --help` and `docs/dldr.md` in the source archive.
 To launch an AppImage from the CLI:
 
 ```sh
-dldr gui /absolute/path/to/DLDR_0.1.3_amd64.AppImage
+dldr gui /absolute/path/to/DLDR_0.1.4_amd64.AppImage
 ```
 
 Alternatively set `DLDR_GUI` to an executable path. It is a path, not a shell
@@ -74,7 +74,7 @@ The CLI archive also contains `install-linux.py` and `icon.png`. Python 3 is
 needed only for this optional installer:
 
 ```sh
-python3 install-linux.py --appimage /path/to/DLDR_0.1.3_amd64.AppImage --cli ./dldr
+python3 install-linux.py --appimage /path/to/DLDR_0.1.4_amd64.AppImage --cli ./dldr
 ```
 
 It copies the program to `$XDG_DATA_HOME/dldr` (normally `~/.local/share/dldr`),

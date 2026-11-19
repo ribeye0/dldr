@@ -14,6 +14,7 @@
     creditsLoading = false,
     selected = false,
     selectionDisabled = false,
+    selectionForFiles = false,
     onToggleSelection,
     onOpenDetails,
     onOpenDlsite,
@@ -35,6 +36,7 @@
     creditsLoading?: boolean;
     selected?: boolean;
     selectionDisabled?: boolean;
+    selectionForFiles?: boolean;
     onToggleSelection?: (product: Product, range: boolean) => void;
     onOpenDetails: (product: Product) => void;
     onOpenDlsite?: (workId: string) => void;
@@ -93,7 +95,7 @@
   {/if}
   {#if onToggleSelection}
     <label class="selection-toggle" class:checked={selected} class:unavailable={selectionDisabled}
-      title={selectionDisabled ? $t("Only purchased works can be selected") : $t("Select for download; Shift-click to select a range")}>
+      title={selectionForFiles ? $t("Select downloaded work; Shift-click to select a range") : selectionDisabled ? $t("Only purchased works can be selected") : $t("Select for download; Shift-click to select a range")}>
     <input
       type="checkbox"
       class="selection-checkbox"
