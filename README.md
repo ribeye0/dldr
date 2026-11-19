@@ -57,14 +57,25 @@ Choose a package from [Releases](https://github.com/ribeye0/dldr/releases/latest
 For example, on Linux:
 
 ```sh
-chmod +x DLDR_0.1.4_amd64.AppImage
-./DLDR_0.1.4_amd64.AppImage
+chmod +x DLDR_0.1.5_amd64.AppImage
+./DLDR_0.1.5_amd64.AppImage
 ```
 
 Use the version you downloaded. If FUSE is unavailable, add `--appimage-extract-and-run`.
 Windows builds are unsigned; the portable ZIP needs WebView2, which the installer can install if missing.
 
-To update, open **Settings → About & updates → Check for updates**, then choose **Update and restart**. Portable copies stay portable; settings and works remain in place. Finish or pause downloads first. Older releases without this button need one manual upgrade. Update the Arch package with `pacman -U`.
+Open **Settings → About & updates → Check for updates**, then **Download update**.
+Downloads run in the background and can be cancelled. Close the window to keep using DLDR;
+when ready, return and choose **Install and restart**. Finish or pause work downloads and
+wait for syncing to finish before installing. Portable copies stay portable; settings and works remain in place.
+
+**Install local package** accepts an AppImage, Windows portable ZIP, or Windows setup EXE
+matching your current installation. It supports upgrades, downgrades and reinstalls.
+Official packages are signature-checked using an adjacent `.sig` / `latest.json`, or the release metadata online.
+Unsigned self-builds require explicit trust. Keep the original filename, or enter a version for custom builds.
+Export a library backup before downgrading: older versions may not read newer data.
+Prepared packages are kept for the current session; closing DLDR discards them.
+Update the Arch package with `pacman -U`. Older releases without the update button need one manual upgrade.
 
 ## First launch
 

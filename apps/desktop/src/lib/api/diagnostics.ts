@@ -51,6 +51,9 @@ const allowedCommands = new Set([
   "open_external_url",
   "check_app_update",
   "install_app_update",
+  "download_app_update",
+  "cancel_app_update",
+  "prepare_local_app_update",
   "native.dialog",
   "native.updater",
   "native.relaunch",
@@ -140,7 +143,9 @@ export async function diagnosticInvoke<T>(
     void flushReports();
     return value;
   } catch (error) {
-    noteFailure(command, error);
+    if ((command === "download_app_update" || command === "prepare_local_app_update") && error === "update_cancelled") {
+      noteObservation(command, undefined, "cancelled");
+    } else noteFailure(command, error);
     throw error;
   }
 }

@@ -33,6 +33,23 @@ fn safe_relative(path: &Path) -> bool {
         })
 }
 
+#[cfg(windows)]
+pub(super) fn package_version(bytes: &[u8]) -> io::Result<String> {
+    use io::Read;
+    let mut archive = zip::ZipArchive::new(io::Cursor::new(bytes))?;
+    let entry = archive.by_name("DLDR/build-info.json")?;
+    if entry.size() > 65536 {
+        return Err(invalid("Invalid build metadata"));
+    }
+    let mut text = String::new();
+    entry.take(65537).read_to_string(&mut text)?;
+    let value: serde_json::Value = serde_json::from_str(&text)?;
+    value["version"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| invalid("Missing package version"))
+}
+
 fn extract(bytes: &[u8], workspace: &Path, version: &str) -> io::Result<()> {
     let mut archive = zip::ZipArchive::new(io::Cursor::new(bytes))?;
     let mut names = BTreeSet::new();

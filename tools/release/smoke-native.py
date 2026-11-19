@@ -60,7 +60,7 @@ def media_probe(appdir, media):
         mpv.mpv_terminate_destroy(handle)
 
 
-def native_probe(appdir, temporary, qa, pulse_server):
+def native_probe(appdir, temporary, qa, pulse_server, image):
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0)); port = probe.getsockname()[1]
     stubs = temporary / "bin"; stubs.mkdir()
@@ -81,6 +81,12 @@ def native_probe(appdir, temporary, qa, pulse_server):
     if os.geteuid() == 0:
         # Only the disposable rootless-build namespace runs as container uid 0.
         env["WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS"] = "1"
+    # Identify an AppImage installation without ever touching the user's image.
+    # Installer calls below deliberately withhold trust, so this file cannot change.
+    installed = temporary / "installed.AppImage"
+    installed.write_bytes(b"isolated DLDR installation sentinel")
+    installed.chmod(0o755)
+    env["APPIMAGE"] = str(installed)
     log = (qa / "webdriver.log").open("w")
     driver = subprocess.Popen(["WebKitWebDriver", f"--port={port}"], env=env, stdout=log, stderr=log)
     base, session = f"http://127.0.0.1:{port}", None
@@ -325,7 +331,7 @@ def native_probe(appdir, temporary, qa, pulse_server):
         assert update_check.get("kind") in ["appImage", "unsupported"] or "update_" in update_check.get("error", ""), update_check
         js("document.querySelector('.settings-layout .dldr\\\\:my-5 button').click()")
         wait("return !!document.querySelector('dialog[open]')")
-        wait("return document.querySelector('dialog[open]').textContent.includes('DLDR') && document.querySelector('dialog[open] footer button') !== null")
+        wait("return !!document.querySelector('dialog[open] .error') || document.querySelector('dialog[open] [role=status]')?.textContent.includes('DLDR')")
         # An extracted AppDir can report a native build. Close via the header,
         # since its first footer action may open Releases instead of closing.
         js("document.querySelector('dialog[open] header button').click();[...document.querySelectorAll('.settings-layout button')].find(button=>button.textContent.trim()==='GitHub ↗').click()")
@@ -334,7 +340,30 @@ def native_probe(appdir, temporary, qa, pulse_server):
                 break
             time.sleep(.1)
         assert "https://github.com/ribeye0/dldr" in url_log.read_text().splitlines(), url_log.read_text()
-        return {"themes": ["light", "dark", "system"], "languages": ["en", "zh-TW", "zh-CN", "ja"], "firstRun": {"accountForm": True, "defaultFolders": True, "rejectsRelativePathsBeforeSaving": True, "createsWritableUnicodeFolders": True}, "embeddedFrontend": True, "nativeIpc": True, "officialGenreLabelsById": True, "readableUnifiedLogs": True, "blockingFailureCorrelation": True, "localizedLogSearch": True, "unclippedModalNotifications": notification, "nativeArchivePlayback": {"gtkNumericLocale": "C", "compressedWav": True, "automaticVtt": True, "archivesKept": True, "settingsSaved": True, "nativeSliderSeeks": True, "latestSeekWins": True, "largerPlayerControls": metrics}, "inAppUpdate": {"nativeCheck": True, "updateDialog": True, "installNotInvoked": True}, "version": info[0], "identifier": info[1], "profile": "empty temporary XDG directories"}
+        # Stage the real signed artifact through native IPC; never install it.
+        staged = invoke("prepare_local_app_update", {"transferId": "qa-signed", "path": str(image), "version": None})
+        assert staged["value"]["verified"] is True and staged["value"]["direction"] == "reinstall", staged
+        assert staged["value"]["release"]["version"] == version, staged
+        invoke("cancel_app_update", {"transferId": "qa-signed"})
+        missing = invoke("install_app_update", {"trustLocal": False})
+        assert "update_missing" in missing.get("failure", ""), missing
+
+        unsigned = temporary / "DLDR_0.0.0-qa-unpublished_amd64.AppImage"
+        header = bytearray(64); header[:6] = b"\x7fELF\x02\x01"; header[8:11] = b"AI\x02"; header[18] = 62
+        unsigned.write_bytes(header)
+        staged = invoke("prepare_local_app_update", {"transferId": "qa-unsigned", "path": str(unsigned), "version": None})
+        assert staged["value"]["verified"] is False and staged["value"]["direction"] == "downgrade", staged
+        rejected = invoke("install_app_update", {"trustLocal": False})
+        assert "update_untrusted" in rejected.get("failure", ""), rejected
+        invoke("cancel_app_update", {"transferId": "qa-unsigned"})
+        invoke("cancel_app_update", {"transferId": "qa-before-admission"})
+        rejected = invoke("prepare_local_app_update", {"transferId": "qa-before-admission", "path": str(unsigned), "version": None})
+        assert "update_cancelled" in rejected.get("failure", ""), rejected
+        Path(str(unsigned) + ".sig").write_text(Path(str(image) + ".sig").read_text())
+        rejected = invoke("prepare_local_app_update", {"transferId": "qa-tampered", "path": str(unsigned), "version": None})
+        assert "update_signature" in rejected.get("failure", ""), rejected
+        assert installed.read_bytes() == b"isolated DLDR installation sentinel"
+        return {"themes": ["light", "dark", "system"], "languages": ["en", "zh-TW", "zh-CN", "ja"], "firstRun": {"accountForm": True, "defaultFolders": True, "rejectsRelativePathsBeforeSaving": True, "createsWritableUnicodeFolders": True}, "embeddedFrontend": True, "nativeIpc": True, "officialGenreLabelsById": True, "readableUnifiedLogs": True, "blockingFailureCorrelation": True, "localizedLogSearch": True, "unclippedModalNotifications": notification, "nativeArchivePlayback": {"gtkNumericLocale": "C", "compressedWav": True, "automaticVtt": True, "archivesKept": True, "settingsSaved": True, "nativeSliderSeeks": True, "latestSeekWins": True, "largerPlayerControls": metrics}, "inAppUpdate": {"nativeCheck": True, "updateDialog": True, "applicationFilesUnchanged": True, "nativeLocalSignedPackage": True, "unsignedTrustRequired": True, "earlyCancellation": True, "badSignatureRejected": True}, "version": info[0], "identifier": info[1], "profile": "empty temporary XDG directories"}
     finally:
         if session:
             try:
@@ -400,7 +429,7 @@ def main(output):
                     time.sleep(.1)
                 else:
                     raise RuntimeError("QA audio server did not create its socket")
-                native = native_probe(appdir, temporary, qa, f"unix:{socket_path}")
+                native = native_probe(appdir, temporary, qa, f"unix:{socket_path}", images[0])
             finally:
                 audio.terminate()
                 try:

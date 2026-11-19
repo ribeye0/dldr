@@ -70,7 +70,8 @@
       tauriVersion: "2.8.5",
     }}
     appInfoLoading={viewState === "loading"}
-    updateBusy={["checking", "downloading", "installing"].includes(viewState)}
+    updateBusy={viewState === "installing"}
+    updateLabel={["checking", "downloading"].includes(viewState) ? "View update progress" : "Check for updates"}
     onReload={() => {
       languagePriority = buildLanguagePriority(savedPriority);
       titleLanguageFollowsUi = savedFollowsUi;

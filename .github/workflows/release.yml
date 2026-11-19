@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing DLDR tag, e.g. v0.1.4
+        description: Existing DLDR tag, e.g. v0.1.5
         required: true
         type: string
 

@@ -36,6 +36,8 @@
     appInfo = null,
     appInfoLoading = false,
     updateBusy = false,
+    updateLabel = "Check for updates",
+    onChooseLocalUpdate,
     onReload,
     onChooseDirectory,
     onUseDefaultDownloadRoot,
@@ -60,6 +62,8 @@
     appInfo?: AppInfo | null;
     appInfoLoading?: boolean;
     updateBusy?: boolean;
+    updateLabel?: string;
+    onChooseLocalUpdate?: () => void;
     onReload: () => void;
     onChooseDirectory: (kind: "library" | "download") => void;
     onUseDefaultDownloadRoot: () => void;
@@ -193,8 +197,9 @@
         </div>
       </div>
       <div class="dldr:my-5">
-        <UiButton variant="secondary" disabled={updateBusy} onclick={onCheckForUpdates}>{$t("Check for updates")}</UiButton>
-        <p class="dldr:text-sm dldr:text-ui-dim">{$t("Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.")}</p>
+        <UiButton variant="secondary" disabled={updateBusy} onclick={onCheckForUpdates}>{$t(updateLabel)}</UiButton>
+        {#if onChooseLocalUpdate}<UiButton variant="secondary" disabled={updateBusy} onclick={onChooseLocalUpdate}>{$t("Install local package")}</UiButton>{/if}
+        <p class="dldr:text-sm dldr:text-ui-dim">{$t("Download updates in the background, then install when ready. You can also select a local DLDR package to upgrade or downgrade.")}</p>
       </div>
       <div
         class="dldr:mb-5 dldr:flex dldr:flex-wrap dldr:items-center dldr:gap-3 dldr:border-0 dldr:border-t dldr:border-solid dldr:border-ui-line dldr:pt-4"

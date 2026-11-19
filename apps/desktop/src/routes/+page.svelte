@@ -175,8 +175,15 @@
   }
 
   let setupOpen = $state(false);
-  const appUpdate = new UpdateController();
+  const appUpdate = new UpdateController(undefined, () => notifications.success($t("Update downloaded. Open Settings → About & updates to install when ready.")));
   onDestroy(() => appUpdate.dispose());
+  function openAppUpdate(local = false) {
+    const message = $t("Update downloaded. Open Settings → About & updates to install when ready.");
+    for (const toast of notifications.toasts) {
+      if (toast.message === message) notifications.dismiss(toast.id);
+    }
+    return local ? appUpdate.chooseLocal() : appUpdate.check();
+  }
 
   let creditLoadingWorkIds = $state<string[]>([]);
   let bulkDownloadPlanning = $state(false);
@@ -1170,14 +1177,16 @@
       saving={settings.saving}
       appInfo={settings.appInfo}
       appInfoLoading={settings.appInfoLoading}
-      updateBusy={appUpdate.busy}
+      updateBusy={appUpdate.phase === "installing"}
+      updateLabel={appUpdate.statusLabel}
+      onChooseLocalUpdate={() => openAppUpdate(true)}
       onReload={settings.load}
       onChooseDirectory={settings.chooseDirectory}
       onUseDefaultDownloadRoot={settings.useDefaultDownloadRoot}
       onSave={settings.save}
       onOpenGitHub={() => openExternalUrl(GITHUB_URL, "GitHub")}
       onOpenDlsite={() => openExternalUrl(DLSITE_URL, "DLsite")}
-      onCheckForUpdates={() => appUpdate.check()}
+      onCheckForUpdates={() => openAppUpdate()}
     >
       {#snippet accountSettings()}
         <AccountsView embedded

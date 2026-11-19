@@ -1141,7 +1141,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-api"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "bytes",
  "chrono",
@@ -1161,7 +1161,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-archive"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "dotenvy",
  "encoding_rs",
@@ -1173,7 +1173,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-audit"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "serde",
@@ -1189,7 +1189,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-cli"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "clap",
@@ -1209,7 +1209,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-credentials"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -1219,7 +1219,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-desktop"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1234,6 +1234,9 @@ dependencies = [
  "dldr-storage",
  "gtk",
  "libc",
+ "minisign-verify",
+ "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "tauri",
@@ -1253,7 +1256,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-download"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "dldr-api",
  "dldr-archive",
@@ -1267,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-jobs"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "dldr-audit",
@@ -1281,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-library"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "ammonia",
  "async-trait",
@@ -1311,7 +1314,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-player"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "encoding_rs",
  "libc",
@@ -1326,7 +1329,7 @@ dependencies = [
 
 [[package]]
 name = "dldr-storage"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "serde",
  "serde_json",
