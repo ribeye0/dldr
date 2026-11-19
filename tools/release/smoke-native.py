@@ -323,17 +323,18 @@ def native_probe(appdir, temporary, qa, pulse_server):
         # Exercise the real backend and UI without downloading/installing any update.
         update_check = call("POST", "/execute/async", {"script": "const done=arguments[arguments.length-1];window.__TAURI_INTERNALS__.invoke('check_app_update').then(v=>done({ok:true,kind:v.kind}),e=>done({ok:false,error:String(e)}))", "args": []})
         assert update_check.get("kind") in ["appImage", "unsupported"] or "update_" in update_check.get("error", ""), update_check
-        js("const invoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=(command,args)=>command==='check_app_update'?Promise.resolve({kind:'appImage',release:null}):invoke(command,args)")
         js("document.querySelector('.settings-layout .dldr\\\\:my-5 button').click()")
         wait("return !!document.querySelector('dialog[open]')")
         wait("return document.querySelector('dialog[open]').textContent.includes('DLDR') && document.querySelector('dialog[open] footer button') !== null")
-        js("document.querySelector('dialog[open] footer button').click();[...document.querySelectorAll('.settings-layout button')].find(button=>button.textContent.trim()==='GitHub ↗').click()")
+        # An extracted AppDir can report a native build. Close via the header,
+        # since its first footer action may open Releases instead of closing.
+        js("document.querySelector('dialog[open] header button').click();[...document.querySelectorAll('.settings-layout button')].find(button=>button.textContent.trim()==='GitHub ↗').click()")
         for _ in range(100):
-            if url_log.exists():
+            if url_log.exists() and "https://github.com/ribeye0/dldr" in url_log.read_text().splitlines():
                 break
             time.sleep(.1)
-        assert url_log.read_text().strip() == "https://github.com/ribeye0/dldr"
-        return {"themes": ["light", "dark", "system"], "languages": ["en", "zh-TW", "zh-CN", "ja"], "firstRun": {"accountForm": True, "defaultFolders": True, "rejectsRelativePathsBeforeSaving": True, "createsWritableUnicodeFolders": True}, "embeddedFrontend": True, "nativeIpc": True, "officialGenreLabelsById": True, "readableUnifiedLogs": True, "blockingFailureCorrelation": True, "localizedLogSearch": True, "unclippedModalNotifications": notification, "nativeArchivePlayback": {"gtkNumericLocale": "C", "compressedWav": True, "automaticVtt": True, "archivesKept": True, "settingsSaved": True, "nativeSliderSeeks": True, "latestSeekWins": True, "largerPlayerControls": metrics}, "inAppUpdate": {"nativeCheck": True, "latestDialog": True, "installNotInvoked": True}, "version": info[0], "identifier": info[1], "profile": "empty temporary XDG directories"}
+        assert "https://github.com/ribeye0/dldr" in url_log.read_text().splitlines(), url_log.read_text()
+        return {"themes": ["light", "dark", "system"], "languages": ["en", "zh-TW", "zh-CN", "ja"], "firstRun": {"accountForm": True, "defaultFolders": True, "rejectsRelativePathsBeforeSaving": True, "createsWritableUnicodeFolders": True}, "embeddedFrontend": True, "nativeIpc": True, "officialGenreLabelsById": True, "readableUnifiedLogs": True, "blockingFailureCorrelation": True, "localizedLogSearch": True, "unclippedModalNotifications": notification, "nativeArchivePlayback": {"gtkNumericLocale": "C", "compressedWav": True, "automaticVtt": True, "archivesKept": True, "settingsSaved": True, "nativeSliderSeeks": True, "latestSeekWins": True, "largerPlayerControls": metrics}, "inAppUpdate": {"nativeCheck": True, "updateDialog": True, "installNotInvoked": True}, "version": info[0], "identifier": info[1], "profile": "empty temporary XDG directories"}
     finally:
         if session:
             try:
