@@ -27,7 +27,7 @@ def zipped(files):
 
 
 class PublishTests(unittest.TestCase):
-    def test_publish_only_installers_after_source_archiving(self):
+    def test_publish_only_packages_and_update_index_after_source_archiving(self):
         version = '0.1.1'
         info = json.dumps({'commit': COMMIT, 'dirty': False, 'version': version}).encode()
         contents = {
@@ -82,13 +82,14 @@ class PublishTests(unittest.TestCase):
                 patch.dict(os.environ, {'GITHUB_REPOSITORY': 'test/dldr', 'GITHUB_RUN_ID': '123'}), \
                 patch('sys.argv', ['publish.py', 'v0.1.1', COMMIT]), \
                 patch.object(publisher, 'api', side_effect=api), \
+                patch.object(publisher, 'manifest', return_value={'version':version, 'platforms':{}}), \
                 patch.object(publisher, 'gh', side_effect=gh), \
                 patch.object(publisher, 'request', side_effect=lambda url: io.BytesIO(blobs[url])):
             os.chdir(temporary)
             try:
                 publisher.main()
                 self.assertEqual({a['name'] for a in releases['v0.1.1']['assets']}, {
-                    'DLDR_0.1.1_windows_x64.zip', 'DLDR_0.1.1_x64-setup.exe', 'DLDR_0.1.1_amd64.AppImage'})
+                    'DLDR_0.1.1_windows_x64.zip', 'DLDR_0.1.1_x64-setup.exe', 'DLDR_0.1.1_amd64.AppImage', 'latest.json'})
             finally:
                 os.chdir(previous)
 

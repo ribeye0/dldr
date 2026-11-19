@@ -48,6 +48,8 @@ const allowedCommands = new Set([
   "submit_two_factor_code",
   "cancel_two_factor",
   "open_external_url",
+  "check_app_update",
+  "install_app_update",
   "native.dialog",
   "native.updater",
   "native.relaunch",

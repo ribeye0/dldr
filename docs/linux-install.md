@@ -6,11 +6,24 @@ Windows 11 x64 packages are documented in [Windows usage](windows.md).
 Other desktop distributions must be tested; AppImage does not make every system
 library or graphics driver portable.
 
+## Arch Linux
+
+The native Arch package includes both GUI and CLI and uses system libraries:
+
+```sh
+sudo pacman -U dldr-0.1.2-1-x86_64.pkg.tar.zst
+dldr-gui
+dldr --help
+```
+
+Install newer packages with `pacman -U`; in-app replacement applies only to the
+AppImage. Package removal leaves your profile and downloaded works intact.
+
 ## Start the GUI
 
 ```sh
-chmod +x DLDR_0.1.1_amd64.AppImage
-./DLDR_0.1.1_amd64.AppImage
+chmod +x DLDR_0.1.2_amd64.AppImage
+./DLDR_0.1.2_amd64.AppImage
 ```
 
 The GUI does not need Node.js, pnpm or Rust. libmpv, libarchive and the media dependencies
@@ -18,7 +31,7 @@ are packaged for the local player and official WebView. The host still provides
 its desktop, graphics drivers and audio service. If FUSE is unavailable, try:
 
 ```sh
-./DLDR_0.1.1_amd64.AppImage --appimage-extract-and-run
+./DLDR_0.1.2_amd64.AppImage --appimage-extract-and-run
 ```
 
 Open Settings → Download settings to choose the library and temporary folders;
@@ -30,7 +43,7 @@ status opens download progress. Downloads never start merely by opening DLDR.
 The standalone CLI archive is a developer build artifact, not a regular release
 attachment. Build it with `bash tools/release/build-linux.sh` or build just the CLI
 with `cargo build --release -p dldr-cli`. If using the generated archive, extract
-`dldr_0.1.1_linux_x86_64.tar.gz` into its own folder. Either run
+`dldr_0.1.2_linux_x86_64.tar.gz` into its own folder. Either run
 `./dldr` there, or install the executable on your PATH:
 
 ```sh
@@ -49,7 +62,7 @@ status can coexist. See `dldr --help` and `docs/dldr.md` in the source archive.
 To launch an AppImage from the CLI:
 
 ```sh
-dldr gui /absolute/path/to/DLDR_0.1.1_amd64.AppImage
+dldr gui /absolute/path/to/DLDR_0.1.2_amd64.AppImage
 ```
 
 Alternatively set `DLDR_GUI` to an executable path. It is a path, not a shell
@@ -61,7 +74,7 @@ The CLI archive also contains `install-linux.py` and `icon.png`. Python 3 is
 needed only for this optional installer:
 
 ```sh
-python3 install-linux.py --appimage /path/to/DLDR_0.1.1_amd64.AppImage --cli ./dldr
+python3 install-linux.py --appimage /path/to/DLDR_0.1.2_amd64.AppImage --cli ./dldr
 ```
 
 It copies the program to `$XDG_DATA_HOME/dldr` (normally `~/.local/share/dldr`),
@@ -71,9 +84,11 @@ commands or directories are not overwritten. If `dldr` already points to a
 personal development installation, remove that symlink explicitly before using
 this installer; the old program and library are retained.
 
-Run the same installer with new files to update. For an unmanaged AppImage,
-close DLDR and replace the file yourself. Updates are manual; DLDR does not
-install binaries from other projects or release channels.
+Use Settings → About & updates → Check for updates to update an AppImage in
+place. Its directory must be writable. The downloaded package is signature
+verified before replacing the old file, then DLDR restarts. Native development
+builds and separately built CLI binaries still require rebuilding/reinstallation.
+Manual replacement remains available after closing DLDR.
 
 ```sh
 python3 install-linux.py --uninstall
@@ -114,7 +129,7 @@ sha256sum --check SHA256SUMS.txt
 
 Run this in the directory containing the release files. If downloading only a
 subset, missing files are reported; verify the entries for the files you have.
-Hashes detect changed bytes; this preview is not publisher-signed.
+Hashes detect changed bytes. In-app updates additionally verify the publisher signature.
 Notice/source archives accompany the binaries. If the runtime source archive is
 split, concatenate `.part-00`, `.part-01`, … in order before extracting with
 `tar --zstd -xf`. See `THIRD-PARTY.md` in the notice archive.

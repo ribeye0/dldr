@@ -35,6 +35,7 @@ static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 const LIBRARY_ROOT_KEY: &str = "library_root";
 const DOWNLOAD_ROOT_KEY: &str = "download_root";
 const LANGUAGE_PRIORITY_KEY: &str = "language_priority";
+const TITLE_LANGUAGE_FOLLOWS_UI_KEY: &str = "title_language_follows_ui";
 const DOWNLOAD_RATE_KEY: &str = "download_rate_limit_bytes_per_second";
 const MISSING_WORK_DETAIL_STATUS: &str = "missing_from_content_works";
 pub const LOCAL_PRODUCT_OWNER_ID: &str = "__local__";

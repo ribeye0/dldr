@@ -20,6 +20,7 @@ pub(crate) struct AppSettingsDto {
     pub(crate) library_root: Option<String>,
     pub(crate) download_root: Option<String>,
     pub(crate) language_priority: Vec<String>,
+    pub(crate) title_language_follows_ui: bool,
 }
 
 impl From<AppSettings> for AppSettingsDto {
@@ -30,6 +31,7 @@ impl From<AppSettings> for AppSettingsDto {
             library_root: settings.library_root,
             download_root: settings.download_root,
             language_priority: settings.language_priority.into_codes(),
+            title_language_follows_ui: settings.title_language_follows_ui,
         }
     }
 }
@@ -42,6 +44,7 @@ pub(crate) struct SaveSettingsRequest {
     pub(crate) library_root: Option<String>,
     pub(crate) download_root: Option<String>,
     pub(crate) language_priority: Option<Vec<String>>,
+    pub(crate) title_language_follows_ui: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -869,6 +872,7 @@ impl SaveSettingsRequest {
     pub(crate) fn into_app_settings_patch(self) -> Result<AppSettingsPatch, String> {
         Ok(AppSettingsPatch {
             auto_extract: self.auto_extract,
+            title_language_follows_ui: self.title_language_follows_ui,
             ui_locale: self.ui_locale,
             library_root: normalize_path_setting(self.library_root)?,
             download_root: normalize_path_setting(self.download_root)?,

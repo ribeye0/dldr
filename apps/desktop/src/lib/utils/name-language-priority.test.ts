@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildLanguagePriority, defaultLanguagePriority, priorityForLocaleChange,
-  languagePriorityPatch, moveLanguagePriority,
+  buildLanguagePriority, defaultLanguagePriority, reorderLanguagePriority,
+  moveLanguagePriority,
 } from "./name-language-priority";
 
 describe("fixed title language settings", () => {
@@ -14,11 +14,9 @@ describe("fixed title language settings", () => {
   });
   it("preserves supported custom order and makes reorder/undo reversible", () => {
     const baseline = buildLanguagePriority(["ja_JP"]);
-    expect(languagePriorityPatch(baseline, baseline)).toEqual({});
     const moved = moveLanguagePriority(baseline, "en_US", -1);
-    expect(languagePriorityPatch(moved, baseline)).toEqual({languagePriority:moved});
     const undone = moveLanguagePriority(moved, "en_US", 1);
-    expect(languagePriorityPatch(undone, baseline)).toEqual({});
+    expect(undone).toEqual(baseline);
     expect(moveLanguagePriority(baseline,"pt_BR",-1)).toEqual(baseline);
     expect(moveLanguagePriority(baseline,"ja_JP",-1)).toEqual(baseline);
   });
@@ -28,12 +26,12 @@ describe("fixed title language settings", () => {
     for (const locale of ["zh-TW", "zh-CN", "ja", "en"] as const)
       expect(defaultLanguagePriority(locale)).not.toContain("ko_KR");
   });
-  it("follows a locale change only when the preset has not been reordered", () => {
-    const initial=defaultLanguagePriority("zh-TW");
-    const simplified=priorityForLocaleChange(initial,"zh-TW","zh-CN");
-    expect(simplified).toEqual(defaultLanguagePriority("zh-CN"));
-    expect(priorityForLocaleChange(simplified,"zh-CN","zh-TW")).toEqual(initial);
-    const custom=moveLanguagePriority(initial,"ja_JP",-1);
-    expect(priorityForLocaleChange(custom,"zh-TW","zh-CN")).toEqual(custom);
+  it("moves a dragged language across multiple positions and ignores unsupported targets", () => {
+    const initial = defaultLanguagePriority("zh-TW");
+    expect(reorderLanguagePriority(initial, "en_US", "zh_TW")).toEqual(["en_US", "zh_TW", "zh_CN", "ja_JP"]);
+    expect(reorderLanguagePriority(initial, "zh_TW", "en_US")).toEqual(["zh_CN", "ja_JP", "en_US", "zh_TW"]);
+    expect(reorderLanguagePriority(initial, "ja_JP", "ja_JP")).toEqual(initial);
+    expect(reorderLanguagePriority(initial, "ja_JP", "ko_KR")).toEqual(initial);
+    expect(initial).toEqual(defaultLanguagePriority("zh-TW"));
   });
 });

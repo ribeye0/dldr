@@ -29,8 +29,10 @@ def validate(tag=None):
         raise ValueError(f"Unsupported release version: {version}")
     if tag is not None and tag != "v" + version:
         raise ValueError(f"Tag {tag!r} does not match v{version}")
-    if config["bundle"]["createUpdaterArtifacts"] or config.get("plugins", {}).get("updater"):
-        raise ValueError("This release channel uses manual updates, not updater artifacts")
+    updater = config.get("plugins", {}).get("updater", {})
+    if config["bundle"]["createUpdaterArtifacts"] is not True or not updater.get("pubkey") \
+            or updater.get("endpoints") != ["https://github.com/ribeye0/dldr/releases/latest/download/latest.json"]:
+        raise ValueError("Signed updater artifacts and the DLDR release endpoint must be configured")
     repository = "https://github.com/ribeye0/dldr"
     if package.get("homepage") != repository or f'GITHUB_URL = "{repository}"' not in (ROOT / "apps/desktop/src/lib/model/constants.ts").read_text(encoding="utf-8"):
         raise ValueError("Project/release links must point to ribeye0/dldr")

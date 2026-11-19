@@ -4,6 +4,7 @@ export type AppSettings = {
   libraryRoot: string | null;
   downloadRoot: string | null;
   languagePriority: string[];
+  titleLanguageFollowsUi: boolean;
 };
 
 export type AppInfo = {

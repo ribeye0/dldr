@@ -9,6 +9,24 @@ const captures = fs.mkdtempSync(path.join(os.tmpdir(),'dld-card-layout-'));
 const navy = 'rgb(9, 42, 131)';
 const nav = (page,index) => page.locator(`aside nav button[data-view=${['library','downloaded','settings'][index]}]`);
 const cardsReady = page => page.locator('.product-card').first().waitFor();
+const checkLabels = async card => {
+ const labels = await card.locator('.cover-labels').evaluate(node => [...node.querySelectorAll('.badge,.work-id')].map(el => {
+  const box=el.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(el);
+  const text=range.getBoundingClientRect();
+  return {size:parseFloat(getComputedStyle(el).fontSize),x:Math.abs((box.left+box.right-text.left-text.right)/2),y:Math.abs((box.top+box.bottom-text.top-text.bottom)/2),height:box.height};
+ }));
+ assert.equal(labels.length,3);
+ for(const label of labels){assert.ok(label.size>=12);assert.equal(label.height,labels[0].height);assert.ok(label.x<1);assert.ok(label.y<2);}
+};
+const checkCredits = async page => {
+ const credits=await page.locator('dialog .identity-credits > div').evaluateAll(rows=>rows.map(row=>{
+  const label=row.querySelector('dt'),value=row.querySelector('dd'),name=value.querySelector('button');
+  const labelRange=document.createRange(),nameRange=document.createRange();labelRange.selectNodeContents(label);nameRange.selectNodeContents(name);
+  return {left:value.getBoundingClientRect().left,top:labelRange.getClientRects()[0].top-nameRange.getClientRects()[0].top};
+ }));
+ assert.equal(credits.length,2);assert.ok(Math.abs(credits[0].left-credits[1].left)<1);
+ for(const row of credits)assert.ok(Math.abs(row.top)<1,JSON.stringify(credits));
+};
 const measure = page => page.evaluate(()=>({
  width:innerWidth,sidebar:document.querySelector('aside').getBoundingClientRect().width,
  card:document.querySelector('.product-card').getBoundingClientRect().width,
@@ -47,6 +65,7 @@ const measure = page => page.evaluate(()=>({
   }
   await page.setViewportSize({width:1920,height:1080});
   const first=page.locator('.product-card').first();
+  await checkLabels(first);
   const actors=await first.locator('.voice-chip').allTextContents();assert.equal(actors.length,2);
   for(const selector of ['.kind','.age','.product-tag','.voice-chip']){
    const styles=await first.locator(selector).first().evaluate(el=>({border:getComputedStyle(el).borderTopColor,radius:getComputedStyle(el).borderTopLeftRadius}));
@@ -71,6 +90,7 @@ const measure = page => page.evaluate(()=>({
   assert.equal(await page.locator('.product-card input:checked').count(),1);assert.equal(page.url(),url);
   await first.locator('.card-title').click();
   await page.locator('dialog .voice-chip').first().waitFor();assert.deepEqual(await page.locator('dialog .voice-chip').allTextContents(),actors);
+  await checkCredits(page);
   assert.equal(await page.locator('dialog .voice-chip').first().evaluate(el=>getComputedStyle(el).borderTopColor),navy);
   assert.equal(await page.locator('dialog #detail-tags + .chips button').first().evaluate(el=>getComputedStyle(el).borderTopColor),navy);
   await page.locator('dialog .voice-chip').first().click();assert.equal(await page.evaluate(()=>window.__cardLayoutQa.clipboard),actors[0]);
@@ -117,6 +137,8 @@ const measure = page => page.evaluate(()=>({
    await page.locator('form').filter({has:page.locator('#ui-locale')}).locator('button[type=submit]').click();
    await page.waitForFunction(async locale=>(await window.__TAURI_INTERNALS__.invoke('get_settings')).uiLocale===locale,code);
    await nav(page,0).click();await cardsReady(page);
+   await first.locator('.card-title').click();await page.locator('dialog .identity-credits').waitFor();await checkCredits(page);
+   await page.keyboard.press('Escape');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(captures,`${code}-narrow.png`)});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -126,6 +148,7 @@ const measure = page => page.evaluate(()=>({
     return {contained:id.left>=cover.left&&id.right<=cover.right&&id.top>=cover.top&&id.bottom<=cover.bottom,separate:id.top>=badges.bottom||id.left>=badges.right};
    });
    assert.equal(coverLabels.contained,true);assert.equal(coverLabels.separate,true);
+   await checkLabels(first);
    await page.setViewportSize({width:960,height:1080});
   }
   await page.evaluate(()=>window.__cardLayoutQa.longNames=true);
@@ -134,6 +157,10 @@ const measure = page => page.evaluate(()=>({
   assert.equal(await first.locator('.voice-chip').first().innerText(),'とても長い声優名'.repeat(30));
   assert.equal(await first.locator('.voice-chip').first().evaluate(el=>el.scrollWidth>el.clientWidth),false);
   assert.equal(await page.evaluate(()=>window.__cardLayoutQa.downloads),0);
+  await nav(page,2).click();await page.locator('.settings-layout .tabs button').last().click();
+  assert.equal(await page.locator('.settings-layout details').count(),0);
+  assert.equal(await page.locator('.settings-layout').getByText('Tauri',{exact:true}).count(),0);
+  assert.equal(await page.locator('.settings-layout').getByRole('button',{name:'GitHub ↗',exact:true}).count(),1);
   assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,full,half,captures}));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

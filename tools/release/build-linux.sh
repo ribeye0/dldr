@@ -8,6 +8,9 @@ if [[ $ID != ubuntu || $VERSION_ID != 24.04 || $(uname -m) != x86_64 ]]; then
   exit 1
 fi
 version=$(python3 tools/release/validate.py)
+export TAURI_SIGNING_PRIVATE_KEY="${TAURI_SIGNING_PRIVATE_KEY:-${XDG_DATA_HOME:-$HOME/.local/share}/dldr-signing/updater.key}"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
+python3 tools/release/updater.py check-key
 reuse_build=false
 if [[ ${1:-} == --reuse-build ]]; then reuse_build=true; shift; fi
 target=$(cargo metadata --locked --offline --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
@@ -43,7 +46,10 @@ echo "992d502a248e14ab185448ddf6f6e7d25558cb84d4623c354c3af350c25fccb3  $plugin"
 chmod +x "$plugin"
 rm -f -- "$image"
 ARCH=x86_64 OUTPUT="$image" APPIMAGE_EXTRACT_AND_RUN=1 "$plugin" --appdir "$appdir"
+# Sign the final repacked image; the bundler's earlier signature is now stale.
+python3 tools/release/updater.py sign "$image" --version "$version"
 cp "$image" "$output/"
+cp "$image.sig" "$output/"
 tar -C "$appdir/usr/share/doc" --zstd -cf "$output/DLDR_${version}_notices.tar.zst" dldr
 tar -C "$work" --zstd -cf "$output/DLDR_${version}_runtime-sources.tar.zst" runtime-sources
 source_archive="$output/DLDR_${version}_runtime-sources.tar.zst"

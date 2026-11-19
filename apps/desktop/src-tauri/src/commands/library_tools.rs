@@ -80,6 +80,7 @@ pub(crate) async fn configure_download_folders(
     state
         .storage
         .save_app_settings_patch(&AppSettingsPatch {
+            title_language_follows_ui: None,
             library_root: Some(library.to_string_lossy().into_owned()),
             download_root: Some(staging.to_string_lossy().into_owned()),
             ui_locale: Some(ui_locale),

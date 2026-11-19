@@ -13,7 +13,7 @@
     facetsFor,
     type PreviewProduct,
   } from "../fixtures/library";
-  import { buildLanguagePriority, defaultLanguagePriority } from "$lib/utils/name-language-priority";
+  import { buildLanguagePriority, defaultLanguagePriority, sameLanguagePriority } from "$lib/utils/name-language-priority";
   import { isActiveJob } from "$lib/utils/jobs";
   import type {
     DownloadQueueEntry,
@@ -82,12 +82,18 @@
       uiLocale: missingCredits ? "zh-TW" : "en",
       libraryRoot: setup ? null : "/tmp/dlsite-library",
       downloadRoot: setup ? null : "/tmp/dlsite-downloads",
-      languagePriority: defaultLanguagePriority("en"),
+      languagePriority: defaultLanguagePriority(missingCredits ? "zh-TW" : "en"),
+      titleLanguageFollowsUi: true,
     };
     const storedSettings = sessionStorage.getItem(settingsKey);
-    if (storedSettings)
-      settings = { ...settings, ...JSON.parse(storedSettings) };
-    settings.languagePriority = buildLanguagePriority(settings.languagePriority, settings.uiLocale);
+    if (storedSettings) {
+      const saved = JSON.parse(storedSettings);
+      settings = { ...settings, ...saved };
+      settings.titleLanguageFollowsUi = saved.titleLanguageFollowsUi ?? sameLanguagePriority(
+        buildLanguagePriority(settings.languagePriority, settings.uiLocale), defaultLanguagePriority(settings.uiLocale ?? "en"));
+    }
+    settings.languagePriority = settings.titleLanguageFollowsUi
+      ? defaultLanguagePriority(settings.uiLocale ?? "en") : buildLanguagePriority(settings.languagePriority, settings.uiLocale);
     const makerNames: Record<string, string> = {
       "North Window Studio": "北窓スタジオ",
       "Quiet Coast": "静かな海岸",
@@ -275,8 +281,10 @@
           const patch = args.settings as Partial<AppSettings>;
           if (patch.libraryRoot === "/fail-save")
             throw new Error("Could not save settings (simulated)");
-          settings = { ...settings, ...patch };
-          settings.languagePriority = buildLanguagePriority(settings.languagePriority, settings.uiLocale);
+          const followsUi = patch.titleLanguageFollowsUi ?? (patch.languagePriority ? false : settings.titleLanguageFollowsUi);
+          settings = { ...settings, ...patch, titleLanguageFollowsUi: followsUi };
+          settings.languagePriority = followsUi ? defaultLanguagePriority(settings.uiLocale ?? "en")
+            : buildLanguagePriority(settings.languagePriority, settings.uiLocale);
           sessionStorage.setItem(settingsKey, JSON.stringify(settings));
           return settings;
         }
@@ -441,7 +449,7 @@
           return "/tmp/dlsite-diagnostics.zip";
         if (command === "save_product_cover") return true;
         if (command === "plugin:dialog|open") return setup ? "/tmp/中文 日本語 Downloads/dldr" : reliability ? "/tmp/story-library-backup.json" : null;
-        if (command === "plugin:updater|check") return null;
+        if (command === "check_app_update") return { kind:"appImage", release:null };
         if (
           [
             "open_dlsite_play",

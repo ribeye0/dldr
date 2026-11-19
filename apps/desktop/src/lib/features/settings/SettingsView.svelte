@@ -9,7 +9,6 @@
   import UiButton from "$lib/components/ui/ActionButton.svelte";
   import Choices from "$lib/components/ui/ChoiceGroup.svelte";
   import Mark from "$lib/components/layout/AppMark.svelte";
-  import Disclosure from "$lib/components/ui/Disclosure.svelte";
   import Field from "$lib/components/ui/Field.svelte";
   import TextInput from "$lib/components/ui/TextInput.svelte";
   import LibraryMaintenance from "./LibraryMaintenance.svelte";
@@ -17,10 +16,8 @@
   import type { AppInfo } from "$lib/model/types";
   import { appInfoValue } from "$lib/utils/format";
   import { DEFAULT_LANGUAGE_PRIORITY } from "$lib/model/constants";
-  import { buildLanguagePriority } from "$lib/utils/name-language-priority";
-  const titleLanguageLabels: Record<string, string> = {
-    ja_JP: "Japanese", zh_TW: "Traditional Chinese", zh_CN: "Simplified Chinese", en_US: "English",
-  };
+  import TitleLanguagePreference from "./TitleLanguagePreference.svelte";
+
 
   let {
     tab = $bindable("general"),
@@ -33,14 +30,13 @@
     downloadRoot = $bindable(""),
     autoExtract = $bindable(true),
     languagePriority = $bindable([...DEFAULT_LANGUAGE_PRIORITY]),
+    titleLanguageFollowsUi = $bindable(true),
     loading = false,
     saving = false,
     appInfo = null,
     appInfoLoading = false,
-    updatePhase = "idle",
-    updateProgressMessage = "",
+    updateBusy = false,
     onReload,
-    onMoveLanguage,
     onChooseDirectory,
     onUseDefaultDownloadRoot,
     onSave,
@@ -58,14 +54,13 @@
     downloadRoot?: string;
     autoExtract?: boolean;
     languagePriority?: string[];
+    titleLanguageFollowsUi?: boolean;
     loading?: boolean;
     saving?: boolean;
     appInfo?: AppInfo | null;
     appInfoLoading?: boolean;
-    updatePhase?: "idle" | "checking" | "downloading" | "installing";
-    updateProgressMessage?: string;
+    updateBusy?: boolean;
     onReload: () => void;
-    onMoveLanguage?: (code: string, direction: -1 | 1) => void;
     onChooseDirectory: (kind: "library" | "download") => void;
     onUseDefaultDownloadRoot: () => void;
     onSave: (event: SubmitEvent) => void;
@@ -75,7 +70,6 @@
   } = $props();
 
   const busy = $derived(loading || saving);
-  const visiblePriority = $derived(buildLanguagePriority(languagePriority, uiLocale));
 </script>
 
 <div class="settings-layout dldr:min-w-0">
@@ -173,54 +167,9 @@
           class="dldr:w-full dldr:max-w-sm dldr:rounded-md dldr:border dldr:border-solid dldr:border-ui-line dldr:bg-ui-surface dldr:p-3 dldr:text-ui-ink dldr:text-base">
           {#each locales as code}<option value={code}>{localeNames[code]}</option>{/each}
         </select>
-        <p class="dldr:max-w-2xl dldr:text-sm dldr:text-ui-dim">{$t("Interface language and genres change together. Default title order follows the interface language; a custom order is kept. Save changes to remember this choice. Creator names are independent.")}</p>
+        <p class="dldr:max-w-2xl dldr:text-sm dldr:text-ui-dim">{$t("Interface language and genre labels change together.")}</p>
       </Field>
-      <div class="dldr:max-w-2xl dldr:text-sm dldr:text-ui-dim">
-        <p class="dldr:mt-0">
-          {$t("Choose the language order for work titles. The first available nonempty name is shown. Circle and voice actor names prefer Japanese, Traditional Chinese, then Simplified Chinese; a single supplied name is kept as-is.")}
-        </p>
-        <p class="dldr:mb-0">
-          {$t("Search covers all supplied names. Other languages are grouped under Other and used only when the four preferred languages are unavailable.")}
-        </p>
-      </div>
-      <ol
-        aria-label={$t("Name language priority")}
-        role="list"
-        class="language-priority dldr:m-0 dldr:flex dldr:max-w-3xl dldr:list-none dldr:flex-col dldr:gap-2 dldr:p-0"
-      >
-        {#each visiblePriority as code, index (code)}
-          {@const name = $t(titleLanguageLabels[code])}
-          <li class="language-priority-row">
-            <span class="language-rank" aria-hidden="true">{index + 1}</span>
-            <div class="dldr:min-w-0 dldr:wrap-anywhere dldr:text-sm">
-              <span>{name}</span>
-              {#if name !== code}<code
-                  class="dldr:mt-1 dldr:block dldr:text-xs dldr:text-ui-dim"
-                  >{code}</code
-                >{/if}
-            </div>
-            <div class="dldr:flex dldr:shrink-0 dldr:gap-1">
-              <Button
-                disabled={busy || index === 0}
-                aria-label={$t("Move {0} up", name)}
-                onclick={() => onMoveLanguage?.(code, -1)}>↑</Button
-              >
-              <Button
-                disabled={busy || index === visiblePriority.length - 1}
-                aria-label={$t("Move {0} down", name)}
-                onclick={() => onMoveLanguage?.(code, 1)}>↓</Button
-              >
-            </div>
-          </li>
-        {/each}
-        <li class="language-priority-row">
-          <span class="language-rank" aria-hidden="true">5</span>
-          <div class="dldr:min-w-0 dldr:wrap-anywhere dldr:text-sm">
-            <span>{$t("Other")}</span>
-            <span class="dldr:mt-1 dldr:block dldr:text-xs dldr:text-ui-dim">{$t("Fallback when preferred languages are unavailable")}</span>
-          </div>
-        </li>
-      </ol>
+      <TitleLanguagePreference {uiLocale} bind:languagePriority bind:followsUi={titleLanguageFollowsUi} disabled={busy} />
       <FormActions>
         <Button disabled={busy} onclick={onReload}>{$t("Revert changes")}</Button>
         <Button variant="primary" type="submit" disabled={busy}
@@ -244,8 +193,8 @@
         </div>
       </div>
       <div class="dldr:my-5">
-        <UiButton variant="secondary" onclick={onCheckForUpdates}>{$t("Download updates")} ↗</UiButton>
-        <p class="dldr:text-sm dldr:text-ui-dim">{$t("DLDR updates are downloaded manually from GitHub Releases. Close DLDR before replacing the application; your library and downloaded works are kept.")}</p>
+        <UiButton variant="secondary" disabled={updateBusy} onclick={onCheckForUpdates}>{$t("Check for updates")}</UiButton>
+        <p class="dldr:text-sm dldr:text-ui-dim">{$t("Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.")}</p>
       </div>
       <div
         class="dldr:mb-5 dldr:flex dldr:flex-wrap dldr:items-center dldr:gap-3 dldr:border-0 dldr:border-t dldr:border-solid dldr:border-ui-line dldr:pt-4"
@@ -254,20 +203,6 @@
         ><UiButton variant="secondary" onclick={onOpenDlsite}>DLsite ↗</UiButton
         ><span class="dldr:text-xs dldr:text-ui-dim">MIT License</span>
       </div>
-      <Disclosure title={$t("Application details")}
-        ><dl
-          class="dldr:grid dldr:grid-cols-[auto_minmax(0,1fr)] dldr:gap-3 dldr:text-sm"
-        >
-          <dt>{$t("Identifier")}</dt>
-          <dd class="dldr:m-0 dldr:wrap-anywhere">
-            {$t(appInfoValue(appInfo?.identifier, appInfoLoading))}
-          </dd>
-          <dt>Tauri</dt>
-          <dd class="dldr:m-0">
-            {$t(appInfoValue(appInfo?.tauriVersion, appInfoLoading))}
-          </dd>
-        </dl></Disclosure
-      >
     </section>{/if}
 </div>
 
@@ -286,28 +221,5 @@
   }
   .settings-layout > :global(.page-header .tabs > button) {
     font-weight: 700;
-  }
-  .language-priority-row {
-    display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-    padding: 12px;
-    border: 1px solid var(--dldr-color-ui-line);
-    border-radius: 6px;
-    background: var(--dldr-color-ui-surface);
-  }
-  .language-rank {
-    display: grid;
-    place-items: center;
-    min-height: 36px;
-    border-radius: 6px;
-    background: var(--dldr-color-ui-selected);
-    color: var(--dldr-color-ui-selected-text);
-    font-size: 18px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
   }
 </style>

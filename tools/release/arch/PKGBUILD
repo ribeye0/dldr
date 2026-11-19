@@ -1,0 +1,17 @@
+pkgname=dldr
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='DLsite library, downloader and audio player'
+arch=('x86_64')
+url='https://github.com/ribeye0/dldr'
+license=('MIT' 'OFL-1.1' 'LicenseRef-UnRAR')
+depends=('glibc' 'gcc-libs' 'gtk3' 'webkit2gtk-4.1' 'openssl' 'mpv' 'libarchive' 'xdg-utils')
+optdepends=('gst-libav: additional codecs for DLsite Play'
+            'gst-plugins-good: additional codecs for DLsite Play')
+options=('!strip' '!debug')
+source=('payload.tar')
+sha256sums=('@SHA256@')
+
+package() {
+    cp -a "$srcdir/payload/." "$pkgdir/"
+}

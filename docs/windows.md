@@ -19,6 +19,16 @@ Linux 的帳號與下載資料不會自動搬入 Windows。
 需要系統已有 WebView2；可從 [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/)
 安裝 Evergreen Runtime。Windows 11 通常已提供。
 
+## 更新
+
+到「設定 → 關於與更新 → 檢查更新」，確認版本後按「更新並重新啟動」。
+安裝版會執行新版安裝程式；免安裝版會驗證 ZIP，等待舊程式退出後替換整組
+檔案並重新啟動，維持免安裝形式。替換或啟動失敗時會還原舊檔案；未能還原的
+備份會保留於應用程式目錄的 `.dldr-update-backup-*` 資料夾。
+設定與下載作品不會刪除。更新前請先完成或暫停下載，並等待同步結束。
+Windows 的更新包簽章用於 DLDR 驗證，與 SmartScreen 的程式碼簽署憑證不同。
+沒有更新功能的舊版需先手動升級一次。
+
 ## 首次使用
 
 第一次啟動會依序引導設定 DLsite 帳號、登入並同步作品、確認下載目錄。

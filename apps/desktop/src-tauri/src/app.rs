@@ -74,6 +74,8 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     directories.finish(if result.is_ok(){dldr_audit::AuditOutcome::Succeeded}else{dldr_audit::AuditOutcome::Failed},json!({"phase":"directories","osCode":result.as_ref().err().and_then(std::io::Error::raw_os_error)}));
     result?;
     let instance = dldr_library::LibraryInstanceGuard::acquire(&app_data_dir)?;
+    #[cfg(windows)]
+    commands::updates::portable::cleanup(audit.clone());
     let database_path: PathBuf = app_data_dir.join("dldr.sqlite");
     let mut database = audit.operation("app.startup");
     let storage_result = tauri::async_runtime::block_on(async {
@@ -204,6 +206,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(commands::updates::PendingUpdate::default())
         .setup(move |app| {
             // GTK initializes the process locale. libmpv rejects non-C numeric
             // locales, even when their decimal separator also happens to be a dot.
@@ -295,6 +299,8 @@ pub fn run() {
             commands::settings::get_download_rate_limit,
             commands::settings::set_download_rate_limit,
             commands::desktop::open_external_url,
+            commands::updates::check_app_update,
+            commands::updates::install_app_update,
             diagnostics::diagnostic_summary,
             diagnostics::diagnostic_runs,
             diagnostics::diagnostic_operation,

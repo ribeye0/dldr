@@ -61,9 +61,9 @@ sources, patches and upstream rebuild instructions; static runtime component
 notices are under `bundler-licenses/`.
 The version tag in the DLDR repository contains the application and its build/repack scripts.
 Use the same-version sources and follow `docs/releasing.md` to rebuild.
-No upstream update feed or private signing key is needed for this manual-update
-release channel. SHA256 hashes identify the downloaded files; they do not replace
-a publisher signature.
+DLDR's update feed uses its own signing key. Signatures cover the final packages,
+including their bundled dependencies and notices. The private key is kept
+outside the repository and distribution archives.
 
 The DLDR logo was supplied by the project owner. Genre data comes from DLsite.
 Product artwork and purchased media are not distributed in DLDR release packages.

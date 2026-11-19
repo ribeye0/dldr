@@ -314,10 +314,12 @@
 {/if}
 
 <style>
-  .identity-credits { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 10px 0; font-size: 13px; }
-  .identity-credits div { display: grid; grid-template-columns: minmax(2em, max-content) minmax(0, 1fr); gap: 10px; }
+  .identity-credits { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: 6px 10px; margin: 10px 0; font-size: 13px; line-height: 1.6; }
+  .identity-credits > div { display: contents; }
   .identity-credits dt { color: var(--dldr-color-ui-dim); }
-  .identity-credits dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+  .identity-credits dd { min-width: 0; margin: 0; line-height: inherit; overflow-wrap: anywhere; }
+  .identity-credits .voice-list { align-items: baseline; }
+  .identity-credits button.copy-value { font-size: inherit; line-height: inherit; }
   .product-content {
     color: var(--dldr-color-ui-ink);
     font-size: 13px;

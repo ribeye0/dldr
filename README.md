@@ -18,6 +18,7 @@ Search, download and play your purchased DLsite works.
 - Built-in audio player with automatic VTT matching and a synchronized script view. Play tracks directly from supported archives.
 - DLsite Play integration: listen online, then queue downloads from the official player.
 - Free-text search, precise filters, autocomplete and named playlists.
+- In-app updates for Linux AppImage and Windows, including portable copies.
 - English, Japanese, Traditional Chinese and Simplified Chinese interfaces and genre names. Light and dark themes.
 
 Built with Rust, Tauri and Svelte. The GUI and CLI share the same library and settings.
@@ -30,19 +31,20 @@ Choose a package from [Releases](https://github.com/ribeye0/dldr/releases/latest
 | --- | --- | --- |
 | Windows 11 x64 | `DLDR_VERSION_x64-setup.exe` | Run the installer. |
 | Windows 11 x64, portable | `DLDR_VERSION_windows_x64.zip` | Extract the entire ZIP and open `DLDR/DLDR.Desktop.exe`. Keep the accompanying files. |
+| Arch Linux x86_64 | `dldr-VERSION-1-x86_64.pkg.tar.zst` | Install with `sudo pacman -U FILE.pkg.tar.zst`; run `dldr-gui`. |
 | Linux x86_64, glibc 2.39+ | `DLDR_VERSION_amd64.AppImage` | Make it executable, then open it. |
 
 For example, on Linux:
 
 ```sh
-chmod +x DLDR_0.1.1_amd64.AppImage
-./DLDR_0.1.1_amd64.AppImage
+chmod +x DLDR_0.1.2_amd64.AppImage
+./DLDR_0.1.2_amd64.AppImage
 ```
 
 Use the version you downloaded. If FUSE is unavailable, add `--appimage-extract-and-run`.
 Windows builds are unsigned; the portable ZIP needs WebView2, which the installer can install if missing.
 
-To update, close DLDR and replace the application or run the new installer. Your settings and works remain in place.
+To update, open **Settings → About & updates → Check for updates**, then choose **Update and restart**. Portable copies stay portable; settings and works remain in place. Finish or pause downloads first. Older releases without this button need one manual upgrade. Update the Arch package with `pacman -U`.
 
 ## First launch
 
@@ -54,7 +56,7 @@ Click **Sync** after buying new works. Account and preference settings are group
 
 | Tab | Options |
 | --- | --- |
-| General | Interface language, theme and title-language priority. |
+| General | Interface language, theme and title language (follow the interface or set a custom order). |
 | Download settings | Folders, parallel downloads, speed limit and archive handling. |
 | Accounts | DLsite account and login settings. |
 
@@ -108,7 +110,7 @@ On a supported work page, **Download to DLDR** adds the owned, synced work to yo
 
 The Windows ZIP includes `dldr.exe`. In PowerShell, open the extracted `DLDR` folder and use `.\dldr.exe` in place of `dldr` below.
 
-On Linux, the AppImage is the desktop application. Build the CLI separately with `cargo build --release -p dldr-cli`, then put `target/release/dldr` on your PATH.
+The Arch package includes `dldr`. On other Linux systems, the AppImage is the desktop application. Build the CLI separately with `cargo build --release -p dldr-cli`, then put `target/release/dldr` on your PATH.
 
 ```sh
 dldr login                                      # Interactive login and library sync

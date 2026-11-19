@@ -236,7 +236,7 @@
   .cover-frame { position:relative; }
   .cover-labels { position:absolute; bottom:10px; left:8px; right:8px; display:flex; flex-wrap:wrap; align-items:center; gap:4px; pointer-events:none; }
   .cover-labels > span { display:flex; }
-  .work-id { margin-left:auto; padding:3px 5px; border:1px solid var(--dldr-color-brand-white); border-radius:5px; background:#092a83e6; color:var(--dldr-color-brand-white); font:600 11px/1.2 monospace; cursor:pointer; }
+  .work-id { display:inline-flex; align-items:center; justify-content:center; min-height:24px; margin-left:auto; padding:2px 5px; border:1px solid var(--dldr-color-brand-white); border-radius:5px; background:#092a83e6; color:var(--dldr-color-brand-white); font-family:inherit; font-size:12px; font-weight:600; line-height:18px; font-variant-numeric:tabular-nums; text-align:center; cursor:pointer; }
   .playlist-toggle { position:absolute; top:8px; right:8px; display:grid; place-items:center; width:30px; height:30px; padding:0; border:1px solid var(--dldr-color-ui-line); border-radius:50%; background:var(--dldr-color-ui-surface); color:var(--dldr-color-ui-ink); cursor:pointer; }
   .playlist-toggle[aria-pressed=true] { background:var(--dldr-color-ui-selected); border-color:var(--dldr-color-brand-blue); }
   .playlist-toggle:disabled { opacity:.5; cursor:wait; }

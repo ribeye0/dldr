@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+from updater import manifest
 
 SOURCE_TAG = 'dependency-sources'
 
@@ -161,6 +162,11 @@ def main():
     installers = [f'DLDR_{version}_windows_x64.zip', f'DLDR_{version}_x64-setup.exe', f'DLDR_{version}_amd64.AppImage']
     if not set(installers) <= set(files):
         raise RuntimeError('Missing installer assets')
+    index = Path('latest.json')
+    index.write_text(json.dumps(manifest(version, files, repo), indent=2) + '\n', encoding='utf-8')
+    files[index.name] = index
+    hashes[index.name] = digest(index)
+    release_assets = [*installers, index.name]
     sources = sorted(name for name in files if re.fullmatch(
         rf'DLDR_{re.escape(version)}_(?:windows-runtime-sources\.tar\.gz|runtime-sources\.tar\.zst(?:\.part-\d+)?)', name))
     if not sources or not any('windows-runtime-sources' in n for n in sources) or not any('_runtime-sources' in n for n in sources):
@@ -195,21 +201,21 @@ def main():
     if existing is None:
         gh('create', args.tag, '--verify-tag', '--draft', '--prerelease=' + str('-rc.' in args.tag).lower(),
            '--title', f'DLDR {version}', '--notes-file', notes)
-    if existing and set(asset['name'] for asset in existing['assets']) - set(installers):
+    if existing and set(asset['name'] for asset in existing['assets']) - set(release_assets):
         raise RuntimeError('Unexpected assets in the draft release')
-    gh('upload', args.tag, *(files[name] for name in installers), '--clobber')
+    gh('upload', args.tag, *(files[name] for name in release_assets), '--clobber')
     if '-rc.' in args.tag:
         print('Prepared draft prerelease:', args.tag, flush=True)
         return
     gh('edit', args.tag, '--draft=false', '--prerelease=' + str('-rc.' in args.tag).lower(), '--latest=' + str('-rc.' not in args.tag).lower(), '--notes-file', notes)
     published = api(repo, '/releases/tags/' + args.tag)
     assets = {asset['name']: asset for asset in published['assets']}
-    if published['draft'] or set(assets) != set(installers):
+    if published['draft'] or set(assets) != set(release_assets):
         raise RuntimeError('Published release has an unexpected asset list')
-    for name in installers:
+    for name in release_assets:
         if assets[name]['state'] != 'uploaded' or assets[name].get('digest') != 'sha256:' + hashes[name]:
             raise RuntimeError(f'Published checksum mismatch: {name}')
-    print('Published three verified installers:', published['html_url'], flush=True)
+    print('Published three verified packages and update index:', published['html_url'], flush=True)
 
 
 if __name__ == '__main__':

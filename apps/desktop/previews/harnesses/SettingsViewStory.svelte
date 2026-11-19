@@ -11,8 +11,7 @@
   import { DEFAULT_LANGUAGE_PRIORITY } from "$lib/model/constants";
   import {
     buildLanguagePriority,
-    languagePriorityPatch,
-    moveLanguagePriority,
+    defaultLanguagePriority,
   } from "$lib/utils/name-language-priority";
 
   let {
@@ -34,7 +33,8 @@
   let lastAction = $state("No action yet");
   let savedPriority = $state([...DEFAULT_LANGUAGE_PRIORITY]);
   let languagePriority = $state([...DEFAULT_LANGUAGE_PRIORITY]);
-  let baseline = $state([...DEFAULT_LANGUAGE_PRIORITY]);
+  let titleLanguageFollowsUi = $state(true);
+  let savedFollowsUi = $state(true);
   $effect(() => {
     const saved =
       languagePreset === "subset"
@@ -46,11 +46,11 @@
             ]
           : languagePreset === "unknown"
             ? ["ko_KR", "ja_JP", "pt_BR", "xx_XX", "zh_TW"]
-            : [...DEFAULT_LANGUAGE_PRIORITY];
+            : defaultLanguagePriority("en");
     const draft = buildLanguagePriority(saved);
     savedPriority = saved;
     languagePriority = draft;
-    baseline = [...draft];
+    titleLanguageFollowsUi = savedFollowsUi = languagePreset === "default";
   });
 </script>
 
@@ -60,6 +60,7 @@
     bind:libraryRoot
     bind:downloadRoot
     bind:languagePriority
+    bind:titleLanguageFollowsUi
     loading={viewState === "loading"}
     saving={viewState === "saving"}
     appInfo={{
@@ -69,29 +70,11 @@
       tauriVersion: "2.8.5",
     }}
     appInfoLoading={viewState === "loading"}
-    updatePhase={viewState === "checking" ||
-    viewState === "downloading" ||
-    viewState === "installing"
-      ? viewState
-      : "idle"}
-    updateProgressMessage={viewState === "checking"
-      ? "Checking for updates"
-      : viewState === "downloading"
-        ? "Downloading 3.2.3 68%"
-        : viewState === "installing"
-          ? "Installing 3.2.3"
-          : ""}
+    updateBusy={["checking", "downloading", "installing"].includes(viewState)}
     onReload={() => {
       languagePriority = buildLanguagePriority(savedPriority);
-      baseline = [...languagePriority];
+      titleLanguageFollowsUi = savedFollowsUi;
       lastAction = "Reverted changes";
-    }}
-    onMoveLanguage={(code, direction) => {
-      languagePriority = moveLanguagePriority(
-        languagePriority,
-        code,
-        direction,
-      );
     }}
     onChooseDirectory={(kind) => (lastAction = `Browse ${kind}`)}
     onUseDefaultDownloadRoot={() => {
@@ -100,11 +83,10 @@
     }}
     onSave={(event) => {
       event.preventDefault();
-      const patch = languagePriorityPatch(languagePriority, baseline);
-      lastAction = JSON.stringify({ libraryRoot, downloadRoot, ...patch });
-      if (patch.languagePriority) savedPriority = [...patch.languagePriority];
-      languagePriority = buildLanguagePriority(savedPriority);
-      baseline = [...languagePriority];
+      savedFollowsUi = titleLanguageFollowsUi;
+      savedPriority = titleLanguageFollowsUi ? defaultLanguagePriority($locale) : [...languagePriority];
+      lastAction = JSON.stringify({ libraryRoot, downloadRoot, titleLanguageFollowsUi, languagePriority: savedPriority });
+      languagePriority = [...savedPriority];
     }}
     onOpenGitHub={() => (lastAction = "Open GitHub")}
     onOpenDlsite={() => (lastAction = "Open DLsite")}

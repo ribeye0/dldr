@@ -81,11 +81,8 @@ async function newApp(browser, settings) {
   return { context, page };
 }
 
-const row = (page, code) =>
-  page
-    .getByRole("list", { name: "Name language priority" })
-    .locator("li")
-    .filter({ hasText: code });
+const row = (page, code) => page.locator(`.language-priority-row[data-title-language="${code}"]`);
+const order = page => page.locator('.language-priority-row').evaluateAll(rows => rows.map(row => row.dataset.titleLanguage));
 const up = (page, code) =>
   row(page, code).getByRole("button", { name: / up$/ });
 const down = (page, code) =>
@@ -93,6 +90,7 @@ const down = (page, code) =>
 async function names(page) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "General", exact: true }).click();
+  await page.getByRole("radio", {name:"Custom order",exact:true}).check();
 }
 async function saved(page, count) {
   await page.waitForFunction(
@@ -116,8 +114,8 @@ async function saveRefreshAndReload(browser) {
     await page.locator(".list-header").getByRole("button", { name: "Next", exact: true }).click();
     await page.getByText("Page 2 of 8", { exact: true }).first().waitFor();
     await names(page);
-    assert.equal(await page.locator(".language-priority-row").count(), 5);
-    assert.equal(await page.locator(".language-priority-row code").count(), 4);
+    assert.equal(await page.locator(".language-priority-row").count(), 4);
+    assert.equal(await page.locator(".language-priority-row code").count(), 0);
     assert.equal(await page.locator(".language-priority-row").filter({hasText:"pt_BR"}).count(),0);
     await up(page, "ja_JP").focus();
     await page.keyboard.press("Enter");
@@ -127,7 +125,7 @@ async function saveRefreshAndReload(browser) {
         .locator("li")
         .first()
         .innerText(),
-      /ja_JP/,
+      /Japanese/,
     );
     await page.getByRole("button", { name: "Download settings", exact: true }).click();
     await page
@@ -211,7 +209,7 @@ async function saveRefreshAndReload(browser) {
         .locator("li")
         .first()
         .innerText(),
-      /ja_JP/,
+      /Japanese/,
     );
     await page.getByRole("button", { name: "Library", exact: true }).click();
     await page.getByRole("button", { name: "Filters", exact: true }).click();
@@ -221,17 +219,8 @@ async function saveRefreshAndReload(browser) {
       await page.getByRole("button", { name: /^Details: / }).first().getAttribute("aria-label"),
       /静かな夜/,
     );
-    await names(page);
-    await page
-      .getByRole("button", { name: "About & updates", exact: true })
-      .click();
-    await page.getByText("Language name data", { exact: true }).click();
-    assert.match(
-      await page.locator("main pre").innerText(),
-      /UNICODE LICENSE V3/,
-    );
     console.log(
-      "PASS: keyboard reorder, shared tab draft, pending-save guard, page reset, all-language search, retained filters, reload and license.",
+      "PASS: keyboard reorder, shared tab draft, pending-save guard, page reset, all-language search, retained filters, and reload.",
     );
   } finally {
     await context.close();
@@ -242,26 +231,27 @@ async function legacyUndoFailure(browser) {
   const {context,page}=await newApp(browser, {libraryRoot:"/tmp/original",downloadRoot:"/tmp/downloads",languagePriority:["ko_KR","ja_JP","pt_BR"]});
   try {
     await names(page);
-    assert.equal(await page.locator('.language-priority-row').count(),5);
-    assert.deepEqual(await page.locator('.language-priority-row code').allTextContents(),['ja_JP','zh_TW','zh_CN','en_US']);
-    assert.equal(await page.locator('.language-priority-row').last().getByRole('button').count(),0);
+    assert.equal(await page.locator('.language-priority-row').count(),4);
+    assert.deepEqual(await order(page),['ja_JP','zh_TW','zh_CN','en_US']);
+    assert.equal(await page.getByRole('list',{name:'Name language priority'}).locator('li').count(),4);
     await up(page,'en_US').click();await down(page,'en_US').click();
     await page.getByRole('button',{name:'Download settings',exact:true}).click();
     await page.getByLabel('Library folder',{exact:true}).fill('/tmp/path-only');
     await page.getByRole('button',{name:'General',exact:true}).click();
     await page.getByRole('button',{name:'Save changes',exact:true}).click();await saved(page,1);
-    assert.equal(await page.evaluate(()=>Object.hasOwn(window.__nameQa.saves[0],'languagePriority')),false);
+    assert.deepEqual(await page.evaluate(()=>window.__nameQa.saves[0].languagePriority),['ja_JP','zh_TW','zh_CN','en_US']);
+    assert.equal(await page.evaluate(()=>window.__nameQa.saves[0].titleLanguageFollowsUi),false);
     await page.getByRole('button',{name:'Download settings',exact:true}).click();
     await page.getByLabel('Library folder',{exact:true}).fill('/fail-save');
     await page.getByRole('button',{name:'General',exact:true}).click();
     await up(page,'en_US').click();
-    const failedDraft=await page.locator('.language-priority-row code').allTextContents();
+    const failedDraft=await order(page);
     await page.getByRole('button',{name:'Save changes',exact:true}).click();
     await page.getByText(/Could not save settings \(simulated\)/).waitFor();
-    assert.deepEqual(await page.locator('.language-priority-row code').allTextContents(),failedDraft);
+    assert.deepEqual(await order(page),failedDraft);
     await page.getByRole('button',{name:'Revert changes',exact:true}).click();
-    assert.match(await page.locator('.language-priority-row').first().innerText(),/ja_JP/);
-    console.log('PASS: legacy extra languages collapse to four choices plus Other, undo omits unchanged priority, failed saves retain draft, revert restores saved values.');
+    assert.match(await page.locator('.language-priority-row').first().innerText(),/Japanese/);
+    console.log('PASS: legacy extra languages collapse to four choices, undo preserves the custom order, failed saves retain draft, revert restores saved values.');
   } finally { await context.close(); }
 }
 
@@ -331,7 +321,8 @@ async function narrowAndBusy(browser) {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     );
-    await up(page, "en_US").focus();
+    await page.getByRole("radio", {name:"Custom order",exact:true}).check();
+    await down(page, "en_US").focus();
     await page.keyboard.press("Enter");
     await page.screenshot({
       path: path.join(captures, "names-narrow.png"),

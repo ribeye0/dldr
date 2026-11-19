@@ -114,6 +114,7 @@ pub struct AppSettings {
     pub library_root: Option<String>,
     pub download_root: Option<String>,
     pub language_priority: LanguagePriority,
+    pub title_language_follows_ui: bool,
 }
 
 impl Default for AppSettings {
@@ -124,6 +125,7 @@ impl Default for AppSettings {
             library_root: None,
             download_root: None,
             language_priority: LanguagePriority::default(),
+            title_language_follows_ui: true,
         }
     }
 }
@@ -135,6 +137,7 @@ pub struct AppSettingsPatch {
     pub library_root: Option<String>,
     pub download_root: Option<String>,
     pub language_priority: Option<LanguagePriority>,
+    pub title_language_follows_ui: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

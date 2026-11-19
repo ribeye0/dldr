@@ -8,3 +8,4 @@ pub(crate) mod library_tools;
 pub(crate) mod player;
 pub(crate) mod playlists;
 pub(crate) mod settings;
+pub(crate) mod updates;

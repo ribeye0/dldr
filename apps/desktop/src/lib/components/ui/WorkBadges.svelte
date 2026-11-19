@@ -26,11 +26,11 @@
     r18: "dldr:bg-age-r18-bg dldr:border-age-r18-border dldr:text-age-r18-text",
     unknown: kinds.other,
   };
-  const badge = "dldr:px-1.5 dldr:py-0.5 dldr:rounded dldr:border dldr:border-solid";
+  const badge = "dldr:inline-flex dldr:min-h-6 dldr:items-center dldr:justify-center dldr:px-1 dldr:py-0.5 dldr:rounded dldr:border dldr:border-solid dldr:text-center";
 </script>
 
 <span
-  class="work-badges dldr:inline-flex dldr:flex-wrap dldr:gap-1 dldr:text-[10px] dldr:font-semibold dldr:leading-normal dldr:tracking-normal"
+  class="work-badges dldr:inline-flex dldr:flex-wrap dldr:gap-1 dldr:text-[12px] dldr:font-semibold dldr:leading-[18px] dldr:tracking-normal"
 >
   <span
     class={`badge kind ${badge} ${kinds[tone] ?? kinds.other}`}

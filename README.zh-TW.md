@@ -18,6 +18,7 @@
 - 內建音訊播放器，自動配對 VTT 字幕，以台本顯示同步字幕；支援直接播放壓縮檔內的音軌。
 - 整合 DLsite Play，先線上聆聽，再從官方播放器加入下載佇列。
 - 純文字搜尋、精準條件、自動補全，以及可命名的播放清單。
+- Linux AppImage 與 Windows 支援程式內更新，免安裝版維持免安裝形式。
 - 繁體中文、簡體中文、日文、英文介面與分類名稱，提供淺色、深色主題。
 
 使用 Rust、Tauri 與 Svelte 開發。圖形介面與 CLI 共用作品庫和設定。
@@ -30,19 +31,20 @@
 | --- | --- | --- |
 | Windows 11 x64 | `DLDR_VERSION_x64-setup.exe` | 執行安裝程式。 |
 | Windows 11 x64，免安裝 | `DLDR_VERSION_windows_x64.zip` | 完整解壓縮後，開啟 `DLDR/DLDR.Desktop.exe`，請保留隨附檔案。 |
+| Arch Linux x86_64 | `dldr-VERSION-1-x86_64.pkg.tar.zst` | 用 `sudo pacman -U 檔案.pkg.tar.zst` 安裝，以 `dldr-gui` 啟動。 |
 | Linux x86_64，glibc 2.39+ | `DLDR_VERSION_amd64.AppImage` | 加上執行權限後開啟。 |
 
 Linux 啟動範例：
 
 ```sh
-chmod +x DLDR_0.1.1_amd64.AppImage
-./DLDR_0.1.1_amd64.AppImage
+chmod +x DLDR_0.1.2_amd64.AppImage
+./DLDR_0.1.2_amd64.AppImage
 ```
 
 請使用實際下載的版本檔名。若系統無法使用 FUSE，可加上 `--appimage-extract-and-run` 啟動。
 Windows 版本尚未簽署；免安裝版需要 WebView2，安裝版會在缺少時協助安裝。
 
-更新時先關閉 DLDR，再替換應用程式或執行新版安裝檔。原有設定與作品會保留。
+更新時到「設定 → 關於與更新 → 檢查更新」，再選擇「更新並重新啟動」。免安裝版會維持免安裝形式，設定與作品都會保留；請先完成或暫停下載。沒有此功能的舊版需先手動升級一次。Arch 套件請用 `pacman -U` 更新。
 
 ## 首次使用
 
@@ -54,7 +56,7 @@ Windows 版本尚未簽署；免安裝版需要 WebView2，安裝版會在缺少
 
 | 分頁 | 可調整的項目 |
 | --- | --- |
-| 一般 | 介面語言、主題、作品名稱的語言優先序。 |
+| 一般 | 介面語言、主題、作品標題語言（跟隨介面或自訂順序）。 |
 | 下載設定 | 存放目錄、平行下載數、限速、壓縮檔處理方式。 |
 | 帳號 | DLsite 帳號與登入設定。 |
 
@@ -108,7 +110,7 @@ Windows 版本尚未簽署；免安裝版需要 WebView2，安裝版會在缺少
 
 Windows 免安裝 ZIP 已包含 `dldr.exe`。在 PowerShell 中進入解壓縮後的 `DLDR` 資料夾，將下列指令的 `dldr` 改為 `.\dldr.exe`。
 
-Linux 的 AppImage 為桌面程式。CLI 需另外建置：執行 `cargo build --release -p dldr-cli`，再將 `target/release/dldr` 放入 PATH。
+Arch 套件已包含 `dldr`。其他 Linux 系統的 AppImage 為桌面程式，CLI 需另外建置：執行 `cargo build --release -p dldr-cli`，再將 `target/release/dldr` 放入 PATH。
 
 ```sh
 dldr login                                      # 互動式登入並同步作品

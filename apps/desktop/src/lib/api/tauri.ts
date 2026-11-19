@@ -20,6 +20,7 @@ export type SaveSettingsRequest = {
   libraryRoot: string | null;
   downloadRoot: string | null;
   languagePriority?: string[];
+  titleLanguageFollowsUi?: boolean;
 };
 
 export type SaveAccountRequest = {

@@ -18,6 +18,7 @@ const SETTINGS: &[&str] = &[
     "library_root",
     "download_root",
     "language_priority",
+    TITLE_LANGUAGE_FOLLOWS_UI_KEY,
     "ui_locale",
     "download_rate_limit_bytes_per_second",
     "download_concurrency",
@@ -210,7 +211,7 @@ impl Storage {
                         return Err(invalid("Unknown backup setting"));
                     }
                     match key {
-                        "auto_extract" => {
+                        "auto_extract" | TITLE_LANGUAGE_FOLLOWS_UI_KEY => {
                             value
                                 .parse::<bool>()
                                 .map_err(|_| invalid("Invalid archive preference"))?;

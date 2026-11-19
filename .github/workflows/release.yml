@@ -1,12 +1,10 @@
 name: DLDR release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing DLDR tag, e.g. v0.1.1
+        description: Existing DLDR tag, e.g. v0.1.2
         required: true
         type: string
 
@@ -52,6 +50,9 @@ jobs:
   linux:
     needs: prepare
     runs-on: ubuntu-24.04
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Free unused runner SDK space
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
@@ -98,6 +99,8 @@ jobs:
     runs-on: windows-2025
     env:
       RUSTFLAGS: -C target-feature=+crt-static
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -128,6 +131,7 @@ jobs:
           path: |
             target/dist/windows/*.zip
             target/dist/windows/*setup.exe
+            target/dist/windows/*.sig
             target/dist/windows/*.tar.gz
             target/dist/windows/SHA256SUMS.txt
           if-no-files-found: error
@@ -143,7 +147,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
-      - name: Publish three installers and archive dependency sources
+      - name: Publish packages and update index; archive dependency sources
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}

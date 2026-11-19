@@ -19,6 +19,7 @@ async fn patch_preserves_omitted_priority_and_repairs_invalid_stored_value_atomi
     ])?;
     storage
         .save_app_settings_patch(&AppSettingsPatch {
+            title_language_follows_ui: None,
             auto_extract: None,
             ui_locale: None,
             library_root: Some("/library".into()),
@@ -28,6 +29,7 @@ async fn patch_preserves_omitted_priority_and_repairs_invalid_stored_value_atomi
         .await?;
     let saved = storage
         .save_app_settings_patch(&AppSettingsPatch {
+            title_language_follows_ui: None,
             auto_extract: None,
             ui_locale: None,
             library_root: Some("/new-library".into()),
@@ -478,5 +480,154 @@ async fn legacy_extra_languages_become_fallback_without_rewriting_stored_prefere
         &priority,
     );
     assert_eq!(fallback.as_deref(), Some("First"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn explicit_custom_default_order_survives_locale_changes_reopen_and_backup() -> Result<()> {
+    let dir = tempfile::tempdir().expect("temporary settings database");
+    let database = dir.path().join("settings.sqlite");
+    let storage = Storage::open(&database).await?;
+    storage.run_migrations().await?;
+    assert!(storage.app_settings().await?.title_language_follows_ui);
+    let custom = LanguagePriority::for_locale(UiLocale::TraditionalChinese);
+    let settings = storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            title_language_follows_ui: Some(false),
+            language_priority: Some(custom.clone()),
+            ..Default::default()
+        })
+        .await?;
+    assert!(!settings.title_language_follows_ui);
+    let settings = storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            ui_locale: Some(UiLocale::English),
+            ..Default::default()
+        })
+        .await?;
+    assert_eq!(settings.language_priority, custom);
+    assert!(!settings.title_language_follows_ui);
+    let backup = storage.export_library_backup().await?;
+    storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            title_language_follows_ui: Some(true),
+            ..Default::default()
+        })
+        .await?;
+    storage.restore_library_backup(&backup).await?;
+    storage.pool.close().await;
+    let reopened = Storage::open(&database).await?;
+    assert_eq!(reopened.app_settings().await?, settings);
+    Ok(())
+}
+
+#[tokio::test]
+async fn following_interface_language_clears_custom_order_and_survives_backup() -> Result<()> {
+    let storage = migrated_storage().await?;
+    storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            language_priority: Some(LanguagePriority::for_locale(UiLocale::Japanese)),
+            ..Default::default()
+        })
+        .await?;
+    assert!(!storage.app_settings().await?.title_language_follows_ui);
+    let settings = storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            ui_locale: Some(UiLocale::English),
+            title_language_follows_ui: Some(true),
+            ..Default::default()
+        })
+        .await?;
+    assert!(settings.title_language_follows_ui);
+    assert_eq!(
+        settings.language_priority,
+        LanguagePriority::for_locale(UiLocale::English)
+    );
+    let stored: Option<String> = sqlx::query_scalar("SELECT value FROM app_settings WHERE key=?")
+        .bind(LANGUAGE_PRIORITY_KEY)
+        .fetch_optional(&storage.pool)
+        .await?;
+    assert_eq!(stored, None);
+    let backup = storage.export_library_backup().await?;
+    storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            language_priority: Some(LanguagePriority::for_locale(UiLocale::TraditionalChinese)),
+            ..Default::default()
+        })
+        .await?;
+    storage.restore_library_backup(&backup).await?;
+    let settings = storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            ui_locale: Some(UiLocale::SimplifiedChinese),
+            ..Default::default()
+        })
+        .await?;
+    assert!(settings.title_language_follows_ui);
+    assert_eq!(
+        settings.language_priority,
+        LanguagePriority::for_locale(UiLocale::SimplifiedChinese)
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn old_profiles_infer_follow_mode_before_changing_locale_without_losing_custom_order(
+) -> Result<()> {
+    for (raw, follows_ui) in [
+        (r#"["zh_TW","zh_CN","ja_JP","en_US"]"#, true),
+        (r#"["ja_JP","en_US","zh_TW","zh_CN"]"#, false),
+    ] {
+        let storage = migrated_storage().await?;
+        sqlx::query("INSERT INTO app_settings(key,value) VALUES ('language_priority', ?)")
+            .bind(raw)
+            .execute(&storage.pool)
+            .await?;
+        assert_eq!(
+            storage.app_settings().await?.title_language_follows_ui,
+            follows_ui
+        );
+        let settings = storage
+            .save_app_settings_patch(&AppSettingsPatch {
+                ui_locale: Some(UiLocale::English),
+                ..Default::default()
+            })
+            .await?;
+        assert_eq!(settings.title_language_follows_ui, follows_ui);
+        let expected = if follows_ui {
+            LanguagePriority::for_locale(UiLocale::English)
+        } else {
+            LanguagePriority::from_stored(raw)?
+        };
+        assert_eq!(settings.language_priority, expected);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn choosing_custom_without_an_order_freezes_the_current_interface_preset() -> Result<()> {
+    let storage = migrated_storage().await?;
+    storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            ui_locale: Some(UiLocale::English),
+            ..Default::default()
+        })
+        .await?;
+    storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            title_language_follows_ui: Some(false),
+            ..Default::default()
+        })
+        .await?;
+    let settings = storage
+        .save_app_settings_patch(&AppSettingsPatch {
+            ui_locale: Some(UiLocale::Japanese),
+            ..Default::default()
+        })
+        .await?;
+    assert!(!settings.title_language_follows_ui);
+    assert_eq!(
+        settings.language_priority,
+        LanguagePriority::for_locale(UiLocale::English)
+    );
     Ok(())
 }

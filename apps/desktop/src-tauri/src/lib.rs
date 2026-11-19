@@ -14,6 +14,14 @@ mod validation;
 mod window_appearance;
 
 pub use app::run;
+
+/// The verified portable package supplies its own updater helper.
+pub fn run_update_helper_if_requested() -> bool {
+    #[cfg(windows)]
+    return commands::updates::portable::run_if_requested();
+    #[cfg(not(windows))]
+    false
+}
 pub(crate) use state::AppState;
 
 #[cfg(test)]

@@ -45,6 +45,8 @@
   import ProductDetailDialog from "$lib/features/library/ProductDetailDialog.svelte";
   import ProductImagePreviewView from "$lib/features/library/ProductImagePreview.svelte";
   import SettingsView from "$lib/features/settings/SettingsView.svelte";
+  import UpdateDialog from "$lib/features/settings/UpdateDialog.svelte";
+  import { UpdateController } from "$lib/controllers/update-controller.svelte";
   import {
     DEFAULT_LANGUAGE_PRIORITY,
     PRODUCT_PAGE_SIZE,
@@ -53,9 +55,7 @@
   } from "$lib/model/constants";
   import {
     buildLanguagePriority,
-    priorityForLocaleChange,
-    languagePriorityPatch,
-    moveLanguagePriority,
+    defaultLanguagePriority,
     sameLanguagePriority,
   } from "$lib/utils/name-language-priority";
   import {
@@ -191,13 +191,11 @@
   let settingsSaving = $state(false);
   let draftLanguagePriority = $state([...DEFAULT_LANGUAGE_PRIORITY]);
   let savedLanguagePriority = $state([...DEFAULT_LANGUAGE_PRIORITY]);
-  let baselineLanguagePriority = $state([...DEFAULT_LANGUAGE_PRIORITY]);
+  let titleLanguageFollowsUi = $state(true);
   let appInfo = $state<AppInfo | null>(null);
   let appInfoLoading = $state(true);
-  let updatePhase = $state<"idle" | "checking" | "downloading" | "installing">(
-    "idle",
-  );
-  let updateProgressMessage = $state("");
+  const appUpdate = new UpdateController();
+  onDestroy(() => appUpdate.dispose());
 
   let accounts = $state<Account[]>([]);
   let accountsLoading = $state(true);
@@ -412,7 +410,7 @@
         savedLanguagePriority,
         normalizeLocale(settings.uiLocale),
       );
-      baselineLanguagePriority = [...draftLanguagePriority];
+      titleLanguageFollowsUi = settings.titleLanguageFollowsUi;
       return true;
     } catch (err) {
       if (settingsGeneration.current(generation))
@@ -425,20 +423,15 @@
 
   function changeUiLocale(next: UiLocale) {
     if (settingsLoading || settingsSaving) return;
-    draftLanguagePriority = priorityForLocaleChange(draftLanguagePriority, $locale, next);
+    if (titleLanguageFollowsUi) draftLanguagePriority = defaultLanguagePriority(next);
     $locale = next;
   }
 
-  function moveLanguage(code: string, direction: -1 | 1) {
-    if (settingsLoading || settingsSaving) return;
-    draftLanguagePriority = moveLanguagePriority(
-      draftLanguagePriority,
-      code,
-      direction,
-    );
+  async function checkForUpdates() {
+    await appUpdate.check();
   }
 
-  async function checkForUpdates() {
+  async function openReleases() {
     try {
       await native.openExternalUrl(`${GITHUB_URL}/releases`);
     } catch (err) {
@@ -457,10 +450,8 @@
         uiLocale: $locale,
         libraryRoot: valueOrNull(libraryRoot),
         downloadRoot: valueOrNull(downloadRoot),
-        ...languagePriorityPatch(
-          draftLanguagePriority,
-          baselineLanguagePriority,
-        ),
+        titleLanguageFollowsUi,
+        ...(titleLanguageFollowsUi ? {} : { languagePriority: draftLanguagePriority }),
       });
       autoExtract = savedAutoExtract = settings.autoExtract ?? true;
       const priorityChanged = !sameLanguagePriority(
@@ -472,7 +463,7 @@
         savedLanguagePriority,
         normalizeLocale(settings.uiLocale),
       );
-      baselineLanguagePriority = [...draftLanguagePriority];
+      titleLanguageFollowsUi = settings.titleLanguageFollowsUi;
       // Start invalidation synchronously after commit, before another await can
       // allow an old list/detail response to overwrite the saved projection.
       const refresh = priorityChanged
@@ -1696,14 +1687,13 @@
       bind:downloadRoot
       bind:autoExtract
       bind:languagePriority={draftLanguagePriority}
+      bind:titleLanguageFollowsUi
       loading={settingsLoading}
       saving={settingsSaving}
       {appInfo}
       {appInfoLoading}
-      {updatePhase}
-      {updateProgressMessage}
+      updateBusy={appUpdate.busy}
       onReload={loadSettings}
-      onMoveLanguage={moveLanguage}
       onChooseDirectory={chooseSettingsDirectory}
       onUseDefaultDownloadRoot={useDefaultDownloadRoot}
       onSave={saveSettings}
@@ -1750,6 +1740,7 @@
     </SettingsView>
   {/if}
 
+  <UpdateDialog update={appUpdate} onOpenReleases={openReleases} />
   <ConfirmationDialogView
     dialog={confirmationDialog}
     onClose={closeConfirmationDialog}

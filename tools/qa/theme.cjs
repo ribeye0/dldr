@@ -51,6 +51,7 @@ async function contrast(page, selectors) {
   await nav(page,'settings').click();assert.equal(await page.locator('#ui-theme').inputValue(),'dark');
   await page.locator('#ui-theme').selectOption('light');await resolved(other,'light');
   await page.locator('#ui-theme').selectOption('dark');await resolved(other,'dark');await other.close();
+  await page.getByRole('radio',{name:'Custom order',exact:true}).check();
   const ratios=await contrast(page,['h1','#ui-theme','#ui-theme-hint','#ui-locale','.language-rank','.language-priority-row .ui-button:not(:disabled)']);
   await page.screenshot({path:path.join(captures,'settings-dark.png')});
   for(const section of ['Download settings','Accounts','Logs','About & updates']){

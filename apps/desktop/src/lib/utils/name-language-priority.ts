@@ -12,13 +12,6 @@ export function defaultLanguagePriority(locale: UiLocale): string[] {
   }
 }
 
-// Only an untouched locale preset follows a locale change. User reordering stays explicit.
-export function priorityForLocaleChange(draft: readonly string[], current: UiLocale, next: UiLocale) {
-  return sameLanguagePriority(draft, defaultLanguagePriority(current))
-    ? defaultLanguagePriority(next)
-    : [...draft];
-}
-
 export function sameLanguagePriority(a: readonly string[], b: readonly string[]) {
   return a.length === b.length && a.every((code, index) => code === b[index]);
 }
@@ -40,6 +33,12 @@ export function moveLanguagePriority(codes: readonly string[], code: string, dir
   return result;
 }
 
-export function languagePriorityPatch(draft: readonly string[], baseline: readonly string[]): { languagePriority?: string[] } {
-  return sameLanguagePriority(draft, baseline) ? {} : { languagePriority: [...draft] };
+export function reorderLanguagePriority(codes: readonly string[], source: string, target: string) {
+  const from = codes.indexOf(source), to = codes.indexOf(target);
+  const result = [...codes];
+  if (from >= 0 && to >= 0 && from !== to) {
+    result.splice(from, 1);
+    result.splice(to, 0, source);
+  }
+  return result;
 }

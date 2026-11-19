@@ -13,6 +13,7 @@ import tarfile
 import tempfile
 import urllib.request
 import zipfile
+from updater import check_key, sign, signing_environment
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -129,6 +130,9 @@ def main():
     args = parser.parse_args()
     os.chdir(ROOT)
     version = run(sys.executable, 'tools/release/validate.py', capture=True)
+    if not args.no_installer:
+        os.environ.update(signing_environment())
+    check_key()
     output, cache = args.output.resolve(), args.cache.resolve()
     output.mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
@@ -236,8 +240,10 @@ def main():
         package.add(source_dir, arcname='runtime-sources')
     shutil.rmtree(source_dir)
     artifacts = [zip_path, output / f'DLDR_{version}_windows-source.tar.gz', runtime_source]
+    artifacts.append(sign(zip_path, version))
     if not args.no_installer:
-        artifacts.append(output / f'DLDR_{version}_x64-setup.exe')
+        installer = output / f'DLDR_{version}_x64-setup.exe'
+        artifacts.extend([installer, sign(installer, version)])
     (output / 'SHA256SUMS.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in artifacts))
     print(f'Windows release: {zip_path}\nExecutable: {stage / "DLDR.Desktop.exe"}')
 

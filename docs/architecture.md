@@ -60,10 +60,27 @@ are returned. Downloaded requires a completed record with a local path; folder
 verification is an explicit maintenance action. Selection is independent of the
 current page and query.
 
+## Application updates
+
+Updates are requested explicitly from Settings. The main window's native commands
+use Tauri to download and verify packages against DLDR's public key. The signed
+version must match the update index. Installation holds the same admission lock
+as downloads and syncing; active jobs must finish or pause first.
+
+AppImages are replaced in place and Windows installers use NSIS. Portable ZIPs
+are extracted into a temporary `updates/` directory inside the profile. Their
+new executable runs as `--dldr-apply-update` before normal app initialization,
+waits for the old process handle, backs up changed files and restores them on
+failure. This internal helper entry point must remain compatible in future
+portable releases. It preserves unrelated files and never replaces profile or
+media directories. Staging files are cleaned after restart; failed backups are
+retained for recovery. See [release signing](releasing.md#update-signing).
+
 ## Names and search
 
-Titles retain their localized source values; display order follows the saved
-language preference. Circle and voice credits are separate from genres. Missing
+Titles retain their localized source values. A saved follow-interface/custom
+mode determines whether title order follows interface-language presets or a
+user-defined order; custom orders remain explicit even when they match a preset. Circle and voice credits are separate from genres. Missing
 production credits may be supplemented from public product metadata, with bounded,
 deduplicated requests and cached results. Only supplied production fields appear
 in work details. The original product introduction is loaded on demand from the
