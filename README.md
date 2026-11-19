@@ -23,6 +23,21 @@ Search, download and play your purchased DLsite works.
 
 Built with Rust, Tauri and Svelte. The GUI and CLI share the same library and settings.
 
+## A closer look
+
+Browse work details, read the original product description and queue downloads from DLsite Play.
+
+| Work details | Product page content |
+| --- | --- |
+| See the circle, voice cast, genres and file size, with download actions in one place. | Expand **Product page content** to view the original description and images inside DLDR. |
+| [![Work details with metadata and download actions](docs/images/work-detail.webp)](docs/images/work-detail.webp) | [![Original DLsite product description and images displayed in work details](docs/images/product-page.webp)](docs/images/product-page.webp) |
+
+**From DLsite Play to your download queue**
+
+Listen in the official player, then click **Download to DLDR** on a supported work page to queue an owned, synced work.
+
+[![DLsite Play work page with the Download to DLDR button](docs/images/dlsite-play.webp)](docs/images/dlsite-play.webp)
+
 ## Install
 
 Choose a package from [Releases](https://github.com/ribeye0/dldr/releases/latest). `VERSION` in the filenames is the release version:

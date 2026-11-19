@@ -23,6 +23,21 @@
 
 使用 Rust、Tauri 與 Svelte 開發。圖形介面與 CLI 共用作品庫和設定。
 
+## 功能展示
+
+從查看作品資訊、閱讀商品介紹，到從 DLsite Play 加入下載佇列，一次看懂使用流程。
+
+| 作品詳細資訊 | 商品頁內容 |
+| --- | --- |
+| 集中查看社團、聲優、分類與檔案大小，並直接選擇下載方式。 | 展開「商品頁內容」，在 DLDR 內閱讀原始作品介紹與圖片。 |
+| [![作品詳細資訊，顯示作品資料與下載操作](docs/images/work-detail.webp)](docs/images/work-detail.webp) | [![在作品詳細資訊內展開 DLsite 商品介紹與圖片](docs/images/product-page.webp)](docs/images/product-page.webp) |
+
+**從 DLsite Play 直接加入下載**
+
+在官方播放器線上聆聽後，於支援的作品頁按「下載至 DLDR」，即可將已持有、已同步的作品加入下載佇列。
+
+[![DLsite Play 作品頁中的「下載至 DLDR」按鈕](docs/images/dlsite-play.webp)](docs/images/dlsite-play.webp)
+
 ## 安裝
 
 從 [Releases](https://github.com/ribeye0/dldr/releases/latest) 選擇對應版本，檔名中的 `VERSION` 為版本號：
