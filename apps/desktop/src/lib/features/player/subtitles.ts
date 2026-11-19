@@ -1,7 +1,8 @@
 import type { Cue } from "$lib/api/player";
 export function activeCues(cues: Cue[], position: number, offset: number): Cue[] {
-  const time = position - offset;
-  return cues.filter(cue => cue.start <= time && time < cue.end);
+  // Use the same shifted boundary as seek requests. Subtracting the offset
+  // from the clock can round an exact cue start back into its predecessor.
+  return cues.filter(cue => cue.start+offset <= position && position < cue.end+offset);
 }
 export function mediaTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";

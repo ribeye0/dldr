@@ -911,3 +911,54 @@ fn native_seek_recovers_after_delayed_polling_at_high_speed() {
         worker.state
     );
 }
+
+#[test]
+#[ignore = "requires libmpv; generated silent WAV and null audio output"]
+fn native_seek_does_not_publish_positions_before_subtitle_boundary() {
+    let d = tempfile::tempdir().unwrap();
+    wav(&d.path().join("track.wav"), 45);
+    let shared = Arc::new(Mutex::new(Snapshot {
+        paused: true,
+        volume: 70.0,
+        speed: 1.0,
+        ..Snapshot::default()
+    }));
+    let mut worker = Worker::new(d.path().join("history.json"), shared, true);
+    worker.open("RJ1".into(), d.path().into()).unwrap();
+    worker
+        .control(
+            "RJ1",
+            Control::Play {
+                track_id: "track.wav".into(),
+            },
+        )
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while worker.state.loading {
+        worker.tick();
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    for target in [5.1234, 2.3333, 8.9999, 3.001, 12.5678, 1.7777] {
+        worker
+            .control("RJ1", Control::Seek { position: target })
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_millis(250);
+        while Instant::now() < deadline {
+            worker.tick();
+            assert!(
+                worker.state.position >= target,
+                "Subtitle seek to {target} rolled back to {} (engine={:?}, seeking={})",
+                worker.state.position,
+                worker.engine.as_ref().unwrap().number("time-pos"),
+                worker.engine.as_ref().unwrap().seeking()
+            );
+            thread::sleep(Duration::from_millis(2));
+        }
+        assert!(
+            worker.seek_target.is_none(),
+            "Seek never acknowledged: {:?}",
+            worker.state
+        );
+    }
+}

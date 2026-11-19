@@ -15,7 +15,7 @@ Search, download and play your purchased DLsite works.
 - A cover-based library with circle, voice actor, genre and release-date metadata.
 - Read the original DLsite product description directly in work details.
 - Batch downloads across pages, up to four parallel works, pause/resume and a shared speed limit.
-- Built-in audio player with automatic VTT matching and a synchronized script view. Play tracks directly from supported archives.
+- Built-in audio player with automatic VTT matching, synchronized subtitles and a full-window script reader. Play tracks directly from supported archives.
 - DLsite Play integration: listen online, then queue downloads from the official player.
 - Free-text search, precise filters, autocomplete and named playlists.
 - In-app updates for Linux AppImage and Windows, including portable copies.
@@ -37,6 +37,12 @@ Browse work details, manage downloads and listen with synchronized subtitles.
 | Overall and per-work progress, transfer speeds and pause/resume controls. | Track controls and VTT subtitles in a synchronized script view, with optional auto-follow. |
 | [![Download panel showing overall progress, transfer speed and per-work controls](docs/images/download-progress.webp)](docs/images/download-progress.webp) | [![Expanded audio player with playback controls and highlighted VTT subtitles](docs/images/player.webp)](docs/images/player.webp) |
 
+**Script reading mode**
+
+Open **Reading mode** from the player for a full-window script with search, adjustable text size and spacing, and playback controls. The current subtitle is centered and highlighted; scroll to browse freely, or click a line to seek.
+
+[![Full-window script reader with search, highlighted subtitles and playback controls](docs/images/script-reader.webp)](docs/images/script-reader.webp)
+
 **From DLsite Play to your download queue**
 
 Listen in the official player, then click **Download to DLDR** on a supported work page to queue an owned, synced work.
@@ -57,8 +63,8 @@ Choose a package from [Releases](https://github.com/ribeye0/dldr/releases/latest
 For example, on Linux:
 
 ```sh
-chmod +x DLDR_0.1.5_amd64.AppImage
-./DLDR_0.1.5_amd64.AppImage
+chmod +x DLDR_0.1.6_amd64.AppImage
+./DLDR_0.1.6_amd64.AppImage
 ```
 
 Use the version you downloaded. If FUSE is unavailable, add `--appimage-extract-and-run`.
@@ -99,6 +105,8 @@ Click a cover or title for work details. Click the work ID on a cover to copy it
 
 Enter a title, circle, voice actor or genre, then press **Enter** or **Search**. Type `$` for syntax hints and autocomplete, or click a circle, voice actor or genre on a card to add a condition. Search runs against your synced library.
 
+Use **Back to previous results**, **Alt+←** or the mouse Back button to restore the previous filters, page and scroll position. This also works in **Downloaded** and **Playlists**.
+
 | Query | Meaning |
 | --- | --- |
 | `"Cuckoldry (Netorare)"` or `"Childhood Friend"` | Search text in cached metadata. |
@@ -127,7 +135,7 @@ By default, DLDR extracts supported archives and deletes them only after success
 
 In **Downloaded**, click a card's blank area to open the bottom-right player, then choose a track. Expand it for the track list, script and playback settings; drag the top handle down to collapse it without stopping playback.
 
-Subtitles are matched by filename: `foo.wav.vtt` pairs with `foo.wav`. You can also choose a VTT file from the player's subtitle list and adjust its timing offset. The current line is centered and highlighted in the script view. Turn off **Auto-follow playback** above the script to browse freely; your choice is remembered.
+Subtitles are matched by filename: `foo.wav.vtt` pairs with `foo.wav`. You can also choose a VTT file from the player's subtitle list and adjust its timing offset. The current line is centered and highlighted in the script view. Open **Reading mode** for more space, text search and reading settings. Click a subtitle or timestamp to seek; dragging to select text does not change playback. Turn off **Auto-follow playback** or scroll to browse freely. Auto-follow starts enabled on a new track and whenever you enter reading mode.
 
 The upper-right playlist icon toggles a work in your default playlist, even before downloading. Right-click to choose another playlist. Create and rename lists from **Playlists**.
 

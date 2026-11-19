@@ -6,6 +6,7 @@ import ctypes
 import json
 import os
 from pathlib import Path
+import shlex
 import socket
 import sqlite3
 import zipfile
@@ -65,15 +66,31 @@ def native_probe(appdir, temporary, qa, pulse_server, image):
         probe.bind(("127.0.0.1", 0)); port = probe.getsockname()[1]
     stubs = temporary / "bin"; stubs.mkdir()
     url_log = temporary / "urls.txt"
-    opener = stubs / "xdg-open"
-    opener.write_text('#!/bin/sh\nprintf "%s\\n" "$1" >> "$DLDR_QA_URL_LOG"\n')
+    opener = stubs / "gio"
+    probe = stubs / "opener-probe.py"
+    probe.write_text("""#!/usr/bin/python3
+import json, os, sys
+root = __APPDIR__
+keys = ["APPDIR", "APPIMAGE", "PYTHONHOME", "PYTHONPATH", "PERLLIB", "LD_LIBRARY_PATH", "GTK_PATH", "GIO_MODULE_DIR", "GSETTINGS_SCHEMA_DIR", "GDK_PIXBUF_MODULE_FILE", "FONTCONFIG_FILE", "GST_PLUGIN_PATH_1_0"]
+with open(__ENV_LOG__, "w", encoding="utf-8") as stream:
+    json.dump({key: os.environ.get(key) for key in keys}, stream)
+for key in keys:
+    assert root not in os.environ.get(key, ""), key
+assert "APPDIR" not in os.environ
+with open(__URL_LOG__, "a", encoding="utf-8") as stream:
+    stream.write(sys.argv[-1] + "\\n")
+""".replace("__APPDIR__", repr(str(appdir)))
+       .replace("__ENV_LOG__", repr(str(qa / "opener-environment.json")))
+       .replace("__URL_LOG__", repr(str(url_log))))
+    opener.write_text("#!/bin/sh\nexec /usr/bin/python3 " + shlex.quote(str(probe)) +
+                      ' "$@" 2> ' + shlex.quote(str(qa / "opener-stderr.log")) + "\n")
     opener.chmod(0o755)
     downloads = temporary / "中文 日本語 Downloads"
     downloads.mkdir()
     config = temporary / "config"
     config.mkdir()
     (config / "user-dirs.dirs").write_text(f'XDG_DOWNLOAD_DIR="{downloads}"\n')
-    env = os.environ | {"PATH": str(stubs) + ":" + os.environ["PATH"], "DLDR_QA_URL_LOG": str(url_log),
+    env = os.environ | {"PATH": str(stubs) + ":" + os.environ["PATH"],
                         "PULSE_SERVER": pulse_server,
                         "XDG_DATA_HOME": str(temporary / "data"), "XDG_CONFIG_HOME": str(temporary / "config"),
                         "XDG_CACHE_HOME": str(temporary / "cache"), "TAURI_WEBVIEW_AUTOMATION": "true",
@@ -116,6 +133,27 @@ def native_probe(appdir, temporary, qa, pulse_server, image):
                     return
                 time.sleep(.1)
             raise AssertionError(source)
+
+        def mouse_back():
+            # Inject an actual X11 side-button event into the GTK webview.
+            # Synthetic DOM events do not exercise the browser's Back default.
+            x11 = ctypes.CDLL("libX11.so.6")
+            xtest = ctypes.CDLL("libXtst.so.6")
+            x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+            x11.XOpenDisplay.restype = ctypes.c_void_p
+            x11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+            xtest.XTestFakeMotionEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_ulong]
+            xtest.XTestFakeButtonEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
+            display = x11.XOpenDisplay(None)
+            assert display, "Mouse Back acceptance requires the private Xvfb display"
+            try:
+                assert xtest.XTestFakeMotionEvent(display, -1, 600, 200, 0)
+                assert xtest.XTestFakeButtonEvent(display, 8, True, 0)
+                assert xtest.XTestFakeButtonEvent(display, 8, False, 0)
+                x11.XSync(display, False)
+            finally:
+                x11.XCloseDisplay(display)
 
         call("POST", "/window/rect", {"width": 1280, "height": 900})
         wait("return !!document.querySelector('aside nav button[data-view=settings]')")
@@ -171,13 +209,22 @@ def native_probe(appdir, temporary, qa, pulse_server, image):
         archive = local_work / "作品%|.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
             zipped.write(audio, "音声/01.wav")
-            zipped.writestr("音声/01.wav.vtt", "WEBVTT\n\n00:01.000 --> 00:03.000\n測試字幕\n")
+            zipped.writestr("音声/01.wav.vtt", "WEBVTT\n\n00:01.000 --> 00:02.333\n測試字幕\n\n00:02.333 --> 00:08.000\n字幕邊界測試\n")
         with sqlite3.connect(profile / "dldr.sqlite") as db:
             db.execute("INSERT INTO works (work_id,title_json,raw_json,last_detail_sync_at) VALUES (?, ?, ?, '2026-01-01')",
                        ("RJ99999999", '{"ja_JP":"Synthetic archive test"}',
                         json.dumps({"genre_ids": [48, 302, 529, 166, 478]})))
             db.execute("INSERT INTO work_downloads (work_id,status,local_path,unpack_policy,updated_at) VALUES (?, 'downloaded', ?, 'keep_archives', '2026-01-01')",
                        ("RJ99999999", str(local_work)))
+        # Real IPC dispatch from AppRun must strip bundle paths for host handlers.
+        for command, args, target in [
+            ("open_download_folder", {}, library),
+            ("open_work_download", {"request": {"workId": "RJ99999999"}}, local_work),
+            ("open_audit_log_dir", {}, profile / "logs"),
+        ]:
+            result = invoke(command, args)
+            assert "failure" not in result, result
+            assert str(target.resolve()) in url_log.read_text().splitlines(), target
         opened = invoke("open_player", {"request": {"workId": "RJ99999999"}})
         tracks = opened["value"]["media"]["tracks"]
         assert len(tracks) == 1 and tracks[0]["name"] == "01.wav", opened
@@ -250,7 +297,32 @@ def native_probe(appdir, temporary, qa, pulse_server, image):
             js("document.querySelector('.product-card .card-title').click()")
             wait("return !!document.querySelector('dialog[open] #detail-tags')")
             assert sorted(js("return [...document.querySelectorAll('dialog[open] .tag-overview .chips button')].map(node=>node.textContent.trim())")) == sorted(expected_genres)
-            js("document.querySelector('dialog[open] header button').click();document.querySelector('aside nav button[data-view=settings]').click()")
+            searched_genre = js("const tag=document.querySelector('dialog[open] .tag-overview .chips button');const name=tag.textContent.trim();tag.click();return name")
+            wait("return !document.querySelector('dialog[open]') && !!document.querySelector('.filter-back button') && document.querySelectorAll('.product-card').length===1")
+            assert js("return document.querySelector('.search-field input').value") == f"$tag:{searched_genre}$"
+            if language == "en":
+                back_url = js("history.pushState({},'', '#filter-back-test');window.__nativeBackEvents=[];for(const type of ['mousedown','mouseup','auxclick','keydown'])window.addEventListener(type,e=>window.__nativeBackEvents.push({type,button:e.button,key:e.key,prevented:e.defaultPrevented}),true);return location.href")
+                js("document.querySelectorAll('.product-card .product-tag')[1].click()")
+                wait("return document.querySelector('.search-field input').value.split('$tag:').length===3 && document.querySelectorAll('.product-card').length===1")
+                mouse_back()
+                try:
+                    wait(f"return document.querySelector('.search-field input')?.value==={json.dumps(f'$tag:{searched_genre}$')}")
+                except AssertionError as error:
+                    raise AssertionError({"mouseBackEvents": js("return window.__nativeBackEvents"), "url": js("return location.href")}) from error
+                assert js("return location.href") == back_url
+                call("POST", "/actions", {"actions": [{"type": "key", "id": "filter-back-keys", "actions": [
+                    {"type": "keyDown", "value": "\ue00a"}, {"type": "keyDown", "value": "\ue012"},
+                    {"type": "keyUp", "value": "\ue012"}, {"type": "keyUp", "value": "\ue00a"},
+                ]}]})
+            else:
+                js("document.querySelector('.filter-back button').click()")
+            wait("return !document.querySelector('.filter-back') && document.querySelectorAll('.product-card .product-tag').length===5")
+            assert js("return document.querySelector('.search-field input').value") == ""
+            if language == "en":
+                mouse_back()
+                time.sleep(.1)
+                assert js("return location.href") == back_url
+            js("document.querySelector('aside nav button[data-view=settings]').click()")
             wait("return !!document.querySelector('#ui-locale')")
         # A rejected edit of the synthetic account leaves its dialog open.
         # This exercises the packaged toast/top layer without changing real data.
@@ -279,6 +351,24 @@ def native_probe(appdir, temporary, qa, pulse_server, image):
         wait("return !!document.querySelector('.player-panel .track-list button')")
         js("document.querySelector('.player-panel .track-list button').click()")
         wait("return !!document.querySelector('.seek input') && !document.querySelector('.seek input').disabled")
+        # Quick controls are outside the scrolling content and update the real
+        # player. Unmuting restores the volume chosen before muting.
+        js("const v=document.querySelector('.quick-volume input');v.value='35';v.dispatchEvent(new Event('change',{bubbles:true}))")
+        def wait_player_value(field, expected):
+            for _ in range(100):
+                if invoke("player_snapshot")["value"][field] == expected:
+                    return
+                time.sleep(.05)
+            raise AssertionError(f"Player {field} did not reach {expected}")
+
+        wait_player_value("volume", 35)
+        for expected_volume in [0, 35]:
+            wait("return !document.querySelector('.quick-volume button').disabled")
+            js("document.querySelector('.quick-volume button').click()")
+            wait_player_value("volume", expected_volume)
+        wait("return !document.querySelector('.quick-speed select').disabled")
+        js("const speed=document.querySelector('.quick-speed select');speed.value='1.25';speed.dispatchEvent(new Event('change',{bubbles:true}))")
+        wait_player_value("speed", 1.25)
         for target in [8.0, 2.0, 6.0]:
             js(f"const s=document.querySelector('.seek input');s.value='{target}';s.dispatchEvent(new Event('input',{{bubbles:true}}));s.dispatchEvent(new Event('change',{{bubbles:true}}))")
             for _ in range(100):
@@ -292,9 +382,83 @@ def native_probe(appdir, temporary, qa, pulse_server, image):
         js("for(const value of ['2','8','4']){const s=document.querySelector('.seek input');s.value=value;s.dispatchEvent(new Event('input',{bubbles:true}));s.dispatchEvent(new Event('change',{bubbles:true}))}")
         wait("return Number(document.querySelector('.seek input').value)>=4 && Number(document.querySelector('.seek input').value)<5 && !document.querySelector('.player-panel .primary-control').disabled")
         wait("return !!document.querySelector('.cue-time')")
+        # Capture the real DOM across native clock updates. Seeking exactly to
+        # an adjacent cue must not highlight its predecessor even briefly.
+        assert js("return document.querySelector('.follow-switch').checked"), "Playback should start with subtitle following enabled"
+        js("""
+            const root=document.querySelector('.player-panel .script-viewport');
+            window.__subtitleTransitions=[[...root.querySelectorAll('li[aria-current="true"]')].map(row=>row.dataset.cue).join(',')];
+            window.__subtitleObserver=new MutationObserver(()=>{
+                const current=[...root.querySelectorAll('li[aria-current="true"]')].map(row=>row.dataset.cue).join(',');
+                window.__subtitleTransitions.push(current);
+            });
+            window.__subtitleObserver.observe(root,{subtree:true,attributes:true,attributeFilter:['aria-current']});
+            root.querySelector('li[data-cue="1"] .cue-text').click();
+        """)
+        wait("return document.querySelector('.player-panel li[data-cue=\"1\"]')?.getAttribute('aria-current')==='true'")
+        time.sleep(.65)
+        transitions = js("window.__subtitleObserver.disconnect();return window.__subtitleTransitions")
+        assert "1" in transitions and all(value == "1" for value in transitions[transitions.index("1"):]), transitions
+        compact_gap = js("const row=document.querySelector('.player-panel .script-viewport li');return row.querySelector('.cue-text').getBoundingClientRect().top-row.querySelector('.cue-time').getBoundingClientRect().bottom")
+        assert 0 <= compact_gap <= 2, compact_gap
         metrics = js("return {title:getComputedStyle(document.querySelector('.panel-header h2')).fontSize,icon:document.querySelector('.header-actions svg').getBoundingClientRect().width,cue:document.querySelector('.cue-time') && getComputedStyle(document.querySelector('.cue-time')).fontSize}")
         assert metrics == {"title":"16px", "icon":24, "cue":"14px"}, metrics
         (qa / "native-player.png").write_bytes(base64.b64decode(call("GET", "/screenshot")))
+        # The full-window reader uses the same native player and must release
+        # modal focus without stopping audio or making the workspace inert.
+        invoke("control_player", {"request": {"workId": "RJ99999999", "control": {"action": "pause", "paused": True}}})
+        js("const follow=document.querySelector('.follow-switch');if(follow.checked)follow.click()")
+        wait("return !document.querySelector('.follow-switch').checked")
+        js("document.querySelector('.reader-launch').click()")
+        wait("return !!document.querySelector('dialog.script-reader[open] .cue-time')")
+        assert js("return document.querySelector('.script-reader .follow').classList.contains('pressed')"), "Entering reading mode must enable subtitle following"
+        reader_metrics = js("const r=document.querySelector('.script-reader'),v=r.querySelector('.script-viewport');return {fillsWindow:r.clientWidth===innerWidth&&r.clientHeight===innerHeight,readingHeight:v.clientHeight,textSize:getComputedStyle(v.querySelector('.cue-text')).fontSize}")
+        assert reader_metrics["fillsWindow"] and reader_metrics["readingHeight"] > 200 and reader_metrics["textSize"] == "22px", reader_metrics
+        js("document.querySelector('.script-reader .script-viewport').dispatchEvent(new WheelEvent('wheel',{deltaY:120,bubbles:true}))")
+        wait("return !document.querySelector('.script-reader .follow').classList.contains('pressed')")
+        js("const input=document.querySelector('.script-reader input[type=search]');input.value='測試';input.dispatchEvent(new Event('input',{bubbles:true}))")
+        wait("return document.querySelector('.script-reader mark')?.textContent==='測試'")
+        js("document.querySelector('.script-reader .follow').click()")
+        wait("return document.querySelector('.script-reader .follow').classList.contains('pressed') && document.querySelector('.script-reader input[type=search]').value===''")
+        js("document.querySelector('.script-reader .cue-time').click()")
+        for _ in range(100):
+            reader_state = invoke("player_snapshot")["value"]
+            if reader_state["paused"] and abs(reader_state["position"]-1) < .1:
+                break
+            time.sleep(.05)
+        else:
+            raise AssertionError(reader_state)
+        # Native pointer events distinguish a stationary subtitle click from
+        # dragging away and returning before release.
+        invoke("control_player", {"request": {"workId": "RJ99999999", "control": {"action": "seek", "position": 8}}})
+        wait("return Number(document.querySelector('.script-reader .seek input').value)===8")
+        js("document.querySelector('.script-reader .follow').click();document.querySelector('.script-reader .cue-text').scrollIntoView({block:'center',behavior:'instant'})")
+        point = js("const r=document.querySelector('.script-reader .cue-text').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),outside:Math.round(r.x-12)}")
+
+        def subtitle_pointer(actions):
+            call("POST", "/actions", {"actions": [{"type":"pointer", "id":"subtitle-mouse", "parameters":{"pointerType":"mouse"}, "actions":actions}]})
+
+        move = {"type":"pointerMove", "origin":"viewport", "x":point["x"], "y":point["y"], "duration":0}
+        down, up = {"type":"pointerDown", "button":0}, {"type":"pointerUp", "button":0}
+        subtitle_pointer([move, down, {**move,"x":point["outside"]}, move, up])
+        assert abs(invoke("player_snapshot")["value"]["position"]-8) < .1, "Dragging must not seek"
+        js("window.getSelection()?.removeAllRanges()")
+        subtitle_pointer([move, down, up])
+        for _ in range(100):
+            clicked_state = invoke("player_snapshot")["value"]
+            if abs(clicked_state["position"]-1) < .1:
+                break
+            time.sleep(.05)
+        else:
+            raise AssertionError(clicked_state)
+        (qa / "native-script-reader.png").write_bytes(base64.b64decode(call("GET", "/screenshot")))
+        js("document.querySelector('.script-reader .header-actions button:last-child').click()")
+        wait("return !document.querySelector('dialog.script-reader[open]') && !!document.querySelector('.player-panel')")
+        wait("return !document.querySelector('.follow-switch').checked")
+        js("document.querySelector('.panel-header .header-actions button').click()")
+        wait("return !!document.querySelector('dialog.script-reader[open] .follow.pressed')")
+        js("document.querySelector('.script-reader .header-actions button:last-child').click()")
+        wait("return !document.querySelector('dialog.script-reader[open]') && document.querySelector('.follow-switch').checked")
         invoke("control_player", {"request": {"workId": "RJ99999999", "control": {"action": "stop"}}})
         js("document.querySelector('.header-actions button:last-child').click();document.querySelector('aside nav button[data-view=settings]').click()")
         wait("return !!document.querySelector('#ui-locale')")
@@ -363,7 +527,7 @@ def native_probe(appdir, temporary, qa, pulse_server, image):
         rejected = invoke("prepare_local_app_update", {"transferId": "qa-tampered", "path": str(unsigned), "version": None})
         assert "update_signature" in rejected.get("failure", ""), rejected
         assert installed.read_bytes() == b"isolated DLDR installation sentinel"
-        return {"themes": ["light", "dark", "system"], "languages": ["en", "zh-TW", "zh-CN", "ja"], "firstRun": {"accountForm": True, "defaultFolders": True, "rejectsRelativePathsBeforeSaving": True, "createsWritableUnicodeFolders": True}, "embeddedFrontend": True, "nativeIpc": True, "officialGenreLabelsById": True, "readableUnifiedLogs": True, "blockingFailureCorrelation": True, "localizedLogSearch": True, "unclippedModalNotifications": notification, "nativeArchivePlayback": {"gtkNumericLocale": "C", "compressedWav": True, "automaticVtt": True, "archivesKept": True, "settingsSaved": True, "nativeSliderSeeks": True, "latestSeekWins": True, "largerPlayerControls": metrics}, "inAppUpdate": {"nativeCheck": True, "updateDialog": True, "applicationFilesUnchanged": True, "nativeLocalSignedPackage": True, "unsignedTrustRequired": True, "earlyCancellation": True, "badSignatureRejected": True}, "version": info[0], "identifier": info[1], "profile": "empty temporary XDG directories"}
+        return {"themes": ["light", "dark", "system"], "languages": ["en", "zh-TW", "zh-CN", "ja"], "firstRun": {"accountForm": True, "defaultFolders": True, "rejectsRelativePathsBeforeSaving": True, "createsWritableUnicodeFolders": True}, "embeddedFrontend": True, "nativeIpc": True, "hostFolderOpening": {"library": True, "work": True, "logs": True, "isolatedAppImageEnvironment": True}, "officialGenreLabelsById": True, "metadataFilterBackNavigation": True, "readableUnifiedLogs": True, "blockingFailureCorrelation": True, "localizedLogSearch": True, "unclippedModalNotifications": notification, "nativeArchivePlayback": {"gtkNumericLocale": "C", "compressedWav": True, "automaticVtt": True, "archivesKept": True, "settingsSaved": True, "nativeSliderSeeks": True, "subtitleSeekDoesNotRollback": True, "followEnabledOnPlayback": True, "compactSubtitleGap": compact_gap, "quickVolumeAndMute": True, "quickPlaybackSpeed": True, "latestSeekWins": True, "largerPlayerControls": metrics, "scriptReader": {"nativeTimestampSeek": True, "nativeSubtitleClick": True, "subtitleDragRejected": True, "search": True, "manualBrowsing": True, "returnToPlayback": True, **reader_metrics}}, "inAppUpdate": {"nativeCheck": True, "updateDialog": True, "applicationFilesUnchanged": True, "nativeLocalSignedPackage": True, "unsignedTrustRequired": True, "earlyCancellation": True, "badSignatureRejected": True}, "version": info[0], "identifier": info[1], "profile": "empty temporary XDG directories"}
     finally:
         if session:
             try:

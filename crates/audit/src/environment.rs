@@ -151,7 +151,7 @@ impl AuditLogger {
         self.owner.shared.lock().metadata = json!({"schemaVersion":1,"runId":self.run_id(),"appVersion":version,"buildRevision":revision,"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"executable":executable,"workingDirectory":cwd,"packageKind":if packaged{"appImage"}else{"unknown"},"packageDetection":"environment","environment":environment,"environmentObservation":"process_after_launch_wrappers","createdAt":crate::now_string()});
         self.owner.shared.wake.notify_one();
     }
-    /// Only the calling process is observable; the plugin owns helper selection and dispatch.
+    /// Record the caller at the desktop-dispatch boundary; window creation is not observable.
     pub fn opener_environment(&self, cwd: &Path, parent: EnvironmentSnapshot) {
         let startup = self
             .owner
@@ -166,7 +166,7 @@ impl AuditLogger {
         event.stage = "configuration".into();
         event.audience = "support".into();
         event.details = json!({"workingDirectory":self.path_reference(cwd),"parentEnvironment":parent,"startupEnvironmentChanged":changed,
-            "environmentObservation":"parent_at_opener_call","dispatch":"tauri_opener","childEnvironment":"not_observed","selectedHelper":"not_observed","desktopCompletion":"not_observed"});
+            "environmentObservation":"parent_at_opener_call","dispatch":"platform_default","childEnvironment":"not_observed","selectedHelper":"not_observed","desktopCompletion":"not_observed"});
         self.trusted(event);
     }
 }

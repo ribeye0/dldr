@@ -6,7 +6,8 @@
   import { DecisionController, NotificationController } from "$lib/controllers/feedback-controller.svelte";
   import { RequestGeneration } from "$lib/utils/request-generation";
   import { initializeTheme } from "$lib/theme";
-  import { appendSearchToken, parseProductSearch } from "$lib/utils/product-search";
+  import type { MetadataSearchKind } from "$lib/utils/filter-history.svelte";
+  import FilterBackBar from "$lib/components/ui/FilterBackBar.svelte";
   import { downloadMetrics, updateDownloadSession } from "$lib/utils/download-progress";
   import { DOWNLOAD_CONCURRENCY_KEY, DEFAULT_DOWNLOAD_CONCURRENCY, downloadConcurrency } from "$lib/utils/download-concurrency";
   import { installDiagnosticHandlers } from "$lib/api/diagnostics";
@@ -155,6 +156,9 @@
     finally { playOpening = false; }
   }
   let activeView = $state<View>("library");
+  let appShell: AppShell;
+  let playlistView = $state<PlaylistsView>();
+  let filterNavigation = 0;
   let settingsTab = $state("general");
   let downloadPanelOpen = $state(false);
   const downloadQueue = new DownloadQueueController();
@@ -498,7 +502,30 @@
   }
 
   async function searchProducts() {
+    filterNavigation++;
+    gallery.history.clear();
     await gallery.load({ resetPage: true });
+  }
+
+  async function filterByMetadata(kind: MetadataSearchKind, name: string) {
+    const position = appShell.capturePosition(productDetail?.workId);
+    if (activeView === "playlists") {
+      if (playlistView?.filterBy(kind, name, position)) closeProductDetail();
+      return;
+    }
+    if (activeView !== "library" && activeView !== "downloaded") return;
+    if (gallery.loading) return;
+    const generation = ++filterNavigation;
+    const depth = gallery.history.entries.length;
+    const filtering = gallery.filterBy(kind, name, position);
+    if (gallery.history.entries.length > depth) closeProductDetail();
+    if (await filtering && generation === filterNavigation) await appShell.restorePosition({ scrollTop: 0 });
+  }
+
+  async function backToPreviousResults() {
+    const generation = ++filterNavigation;
+    const position = await gallery.back();
+    if (position && generation === filterNavigation) await appShell.restorePosition(position);
   }
 
   async function copyWorkId(workId: string) {
@@ -1050,11 +1077,12 @@
   }
 
   function navigate(view: View) {
+    filterNavigation++;
     playlistMenu=null;
     creditHydration.clearQueue();
     if (view === "library" || view === "downloaded") {
       if (gallery.setScope(view)) selectionAnchorId = null;
-      void gallery.load({ clampInvalidPage: true });
+      void gallery.load({ clampInvalidPage: true, searchOverride: gallery.querySearch });
     }
     activeView = view;
     if (view === "playlists") void playlists.load().catch(cause=>notifications.error(errorMessage(cause)));
@@ -1071,6 +1099,7 @@
 </svelte:head>
 
 <AppShell
+  bind:this={appShell}
   {activeView}
   playerActive={Boolean(player.media)}
   version={settings.appInfo?.version ?? ""}
@@ -1083,6 +1112,7 @@
       open={downloadPanelOpen} onToggle={toggleDownloadPanel} />
   {/snippet}
   {#if activeView === "library" || activeView === "downloaded"}
+    <FilterBackBar visible={gallery.history.entries.length > 0} disabled={gallery.loading} onBack={backToPreviousResults} />
     <LibraryView
       metadataFilters={gallery.metadata}
       onCycleMetadataFilter={gallery.cycleMetadata}
@@ -1149,17 +1179,13 @@
       onChoosePlaylist={choosePlaylist}
       playlistBusy={playlists.busy}
       defaultPlaylistWorkIds={playlists.lists.find(list=>list.id==="0")?.workIds ?? []}
-      onTagSearch={(name) => {
-        gallery.search = appendSearchToken(gallery.search,"tag",name);
-        if (!parseProductSearch(gallery.search).error) void searchProducts();
-      }}
-      onPrecisionSearch={(kind,name) => {
-        gallery.search = appendSearchToken(gallery.search,kind,name);
-        if (!parseProductSearch(gallery.search).error) void searchProducts();
-      }}
+      onTagSearch={(name) => void filterByMetadata("tag", name)}
+      onPrecisionSearch={filterByMetadata}
     />
   {:else if activeView === "playlists"}
-    <PlaylistsView controller={playlists} onOpenDetails={openProductDetail} onCopyWorkId={copyWorkId} onOpenPlayer={openPlayer}
+    <PlaylistsView bind:this={playlistView} controller={playlists} onCapturePosition={() => appShell.capturePosition()}
+      onRestorePosition={(position, focus) => void appShell.restorePosition(position, focus)}
+      onOpenDetails={openProductDetail} onCopyWorkId={copyWorkId} onOpenPlayer={openPlayer}
       onOpenFolder={openDownloadedProduct} onOpenDlsite={openDlsiteProductPage} onOpenOnline={requestOnlinePlay} onDownload={runProductDownloadAction} getActiveJob={(product) => activeWorkDownloadJob(product.workId)} onTogglePlaylist={(work)=>void togglePlaylist(work)}
       onChoosePlaylist={choosePlaylist} onError={notifications.error} detailLoadingWorkId={productDetailLoadingWorkId} />
   {:else}
@@ -1276,6 +1302,7 @@
     {/if}
   {/if}
   <ProductDetailDialog
+    onFilter={filterByMetadata}
     detail={productDetail}
     activeJob={productDetail
       ? activeWorkDownloadJob(productDetail.workId)

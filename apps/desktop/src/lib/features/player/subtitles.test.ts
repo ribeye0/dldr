@@ -10,6 +10,17 @@ describe("player subtitles", () => {
     expect(activeCues(cues,0,-1)).toEqual([cues[0]]);
     expect(activeCues(cues,5,0)).toEqual([]);
   });
+  it("keeps a subtitle seek on its exact boundary when an offset is applied", () => {
+    for (const start of [0.009,1.302,31.57]) {
+      const previous = {start:0,end:start,text:"previous"};
+      const current = {start,end:start+1,text:"current"};
+      for (const offset of [-0.7,-0.1,0.1,0.7]) {
+        if (start+offset < 0) continue;
+        expect(activeCues([previous,current],start+offset,offset)).toEqual([current]);
+        expect(activeCues([previous,current],current.end+offset,offset)).toEqual([]);
+      }
+    }
+  });
   it("formats long audio and invalid clocks", () => {
     expect(mediaTime(3661.3)).toBe("1:01:01"); expect(mediaTime(61)).toBe("1:01");
     expect(mediaTime(NaN)).toBe("0:00"); expect(mediaTime(-1)).toBe("0:00");

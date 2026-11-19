@@ -21,6 +21,7 @@
   import { untrack } from "svelte";
   import { openExternalUrl } from "$lib/api/native";
   import WorkBadges from "$lib/components/ui/WorkBadges.svelte";
+  import type { MetadataSearchKind } from "$lib/utils/filter-history.svelte";
   let {
     detail,
     activeJob = null,
@@ -37,6 +38,7 @@
     onRedownload,
     onDeleteDownload,
     downloadDisabled = false,
+    onFilter,
   }: {
     detail: ProductDetail | null;
     activeJob?: JobSnapshot | null;
@@ -56,6 +58,7 @@
     onRedownload?: () => void;
     onDeleteDownload?: () => void;
     downloadDisabled?: boolean;
+    onFilter?: (kind: MetadataSearchKind, name: string) => void;
   } = $props();
   const job = $derived(activeJob && isActiveJob(activeJob) ? activeJob : null);
   const voiceNames = $derived([...new Set(detail?.creditGroups.filter(group => group.kind === "voice").flatMap(group => group.names) ?? [])]);
@@ -154,12 +157,14 @@
               <div><dt>{$t(field.label)}</dt><dd class:voice-list={field.key === "voice"}>
                 {#if field.key === "voice" && voiceNames.length}
                   {#each voiceNames as name (name)}
-                    <button type="button" class="voice-chip dldr:ui-focus-control" title={$t("Copy {0}", name)}
-                      onclick={() => onCopyCredit ? onCopyCredit({ ...field, value: name }, detail.workId) : copy(field.label, name)}>{name}</button>
+                    <button type="button" class="voice-chip dldr:ui-focus-control" title={onFilter ? $t("搜尋聲優：{0}", name) : $t("Copy {0}", name)}
+                      aria-label={onFilter ? $t("搜尋聲優：{0}", name) : undefined}
+                      onclick={() => onFilter ? onFilter("va", name) : onCopyCredit ? onCopyCredit({ ...field, value: name }, detail.workId) : copy(field.label, name)}>{name}</button>
                   {/each}
                 {:else}<button type="button" class="copy-value dldr:ui-focus-text"
-                  disabled={field.missing} title={$t("複製{0}", $t(field.label))}
-                  onclick={() => onCopyCredit ? onCopyCredit(field, detail.workId) : copy(field.label, field.value)}
+                  disabled={field.missing} title={onFilter ? $t(field.key === "maker" ? "搜尋社團：{0}" : "搜尋聲優：{0}", field.value) : $t("複製{0}", $t(field.label))}
+                  aria-label={onFilter && !field.missing ? $t(field.key === "maker" ? "搜尋社團：{0}" : "搜尋聲優：{0}", field.value) : undefined}
+                  onclick={() => onFilter ? onFilter(field.key === "maker" ? "circle" : "va", field.value) : onCopyCredit ? onCopyCredit(field, detail.workId) : copy(field.label, field.value)}
                   >{field.missing ? $t("未提供") : field.value}</button>{/if}
               </dd></div>
             {/each}
@@ -214,9 +219,11 @@
         {#if productGenreTags(detail).length}<section aria-labelledby="detail-tags">
             <h4 id="detail-tags">{$t("分類")}</h4>
             <div class="chips">
-              {#each productGenreTags(detail) as tag}<button
+              {#each productGenreTags(detail) as tag}<button type="button"
                   class="dldr:ui-focus-control"
-                  onclick={() => copy($t("分類"), $genreName(tag.name, tag.genreId))}>{$genreName(tag.name, tag.genreId)}</button
+                  aria-label={onFilter ? $t("Search tag: {0}", $genreName(tag.name, tag.genreId)) : undefined}
+                  title={onFilter ? $t("Search for {0}", $genreName(tag.name, tag.genreId)) : $t("Copy {0}", $genreName(tag.name, tag.genreId))}
+                  onclick={() => onFilter ? onFilter("tag", $genreName(tag.name, tag.genreId)) : copy($t("分類"), $genreName(tag.name, tag.genreId))}>{$genreName(tag.name, tag.genreId)}</button
                 >{/each}
             </div>
           </section>{/if}

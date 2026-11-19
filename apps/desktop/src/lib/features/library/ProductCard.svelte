@@ -87,7 +87,7 @@
   );
 </script>
 
-<article class="product-card dldr:relative dldr:min-w-0" class:selected>
+<article class="product-card dldr:relative dldr:min-w-0" class:selected data-work-id={product.workId}>
   {#if playable}
     <button type="button" class="card-play-target dldr:ui-focus-image"
       aria-label={$t("Open player for {0}", product.title)} title={$t("Open player for {0}", product.title)}

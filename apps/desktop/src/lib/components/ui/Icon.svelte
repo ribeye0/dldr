@@ -1,6 +1,10 @@
 <script lang="ts">
   let { name }: { name: string } = $props();
   const paths: Record<string, string> = {
+    volume: "M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14",
+    muted: "M11 5 6 9H3v6h3l5 4zM16 9l6 6M22 9l-6 6",
+    expand: "M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5",
+    shrink: "M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3",
     playlists: "M4 5h12M4 10h12M4 15h7M16 14v7M12.5 17.5h7",
     chevronDown: "m6 9 6 6 6-6",
     chevronUp: "m6 15 6-6 6 6",

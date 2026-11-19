@@ -4,19 +4,23 @@
   import type { Product, JobSnapshot } from "$lib/model/types";
   import type { PlaylistController } from "$lib/controllers/playlist-controller.svelte";
   import { errorMessage } from "$lib/utils/format";
-  import { appendSearchToken, parseProductSearch } from "$lib/utils/product-search";
+  import { parseProductSearch } from "$lib/utils/product-search";
+  import { FilterHistory, refineSearch, type ListPosition, type MetadataSearchKind } from "$lib/utils/filter-history.svelte";
+  import FilterBackBar from "$lib/components/ui/FilterBackBar.svelte";
   import ProductCard from "$lib/features/library/ProductCard.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import Modal from "$lib/components/ui/Modal.svelte";
   import Pagination from "$lib/components/ui/Pagination.svelte";
   import { PRODUCT_PAGE_SIZE } from "$lib/model/constants";
-  let { controller, onOpenDetails, onCopyWorkId, onOpenPlayer, onOpenFolder, onOpenDlsite, onOpenOnline, onDownload, getActiveJob = () => null, onTogglePlaylist, onChoosePlaylist, onError, detailLoadingWorkId }: {
+  let { controller, onOpenDetails, onCopyWorkId, onOpenPlayer, onOpenFolder, onOpenDlsite, onOpenOnline, onDownload, getActiveJob = () => null, onTogglePlaylist, onChoosePlaylist, onError, detailLoadingWorkId, onCapturePosition = () => ({ scrollTop: 0 }), onRestorePosition = () => {} }: {
     controller:PlaylistController; onOpenDetails:(p:Product)=>void; onCopyWorkId:(id:string)=>void;
     onOpenPlayer:(p:Product)=>void; onOpenFolder:(p:Product)=>void; onOpenDlsite:(id:string)=>void; onOpenOnline?:(p:Product)=>void; onDownload?:(p:Product)=>void | Promise<void>;
     getActiveJob?:(p:Product)=>JobSnapshot|null;
     onTogglePlaylist:(p:Product)=>void; onChoosePlaylist:(p:Product,point:{x:number;y:number;trigger:HTMLButtonElement})=>void;
     onError:(message:string)=>void; detailLoadingWorkId:string|null;
+    onCapturePosition?: () => ListPosition;
+    onRestorePosition?: (position: ListPosition, focus?: boolean) => void;
   } = $props();
   let selectedId = $state("0"); let search = $state(""); let appliedSearch = $state("");
   let page = $state(0); let products = $state<Product[]>([]); let total = $state(0);
@@ -27,6 +31,8 @@
   const selected = $derived(controller.lists.find(list => list.id === selectedId));
   const syntaxError = $derived(parseProductSearch(search).error);
   let displayedQuery: string | null = null;
+  const history = new FilterHistory<{ selectedId: string; search: string; appliedSearch: string; page: number }>();
+  let pendingPosition: { position: ListPosition; focus: boolean } | null = null;
   $effect(() => {
     const revision = controller.revision;
     const id = selectedId; const query = appliedSearch; const offset = page*PRODUCT_PAGE_SIZE;
@@ -46,20 +52,39 @@
       if (background) onError(errorMessage(cause));
       else {products=[];total=0;loadError=errorMessage(cause);}
     } })
-      .finally(() => { if (!cancelled) loading = false; });
+      .finally(() => { if (!cancelled) {
+        loading = false;
+        if (pendingPosition) { const pending = pendingPosition; pendingPosition = null; onRestorePosition(pending.position, pending.focus); }
+      } });
     return () => {cancelled=true;};
   });
-  function submitSearch() { if (!syntaxError) {page=0;appliedSearch=search;} }
+  function submitSearch() { if (!syntaxError) {history.clear();pendingPosition=null;page=0;appliedSearch=search;} }
   function goToPage(next: number) {
     if (!loading && Number.isInteger(next) && next >= 1 && next <= pageCount) page = next - 1;
   }
-  function precision(kind:"circle"|"va"|"tag",value:string) {search=appendSearchToken(search,kind,value);submitSearch();}
+  export function filterBy(kind: MetadataSearchKind, value: string, position = onCapturePosition()) {
+    if (loading) return false;
+    const next = refineSearch(appliedSearch, kind, value);
+    if (next === null) return false;
+    history.push({ selectedId, search, appliedSearch, page }, position);
+    pendingPosition = { position: { scrollTop: 0 }, focus: true };
+    page = 0; search = next; appliedSearch = next;
+    return true;
+  }
+  function back() {
+    if (loading) return;
+    const entry = history.pop();
+    if (!entry) return;
+    pendingPosition = { position: entry.position, focus: true };
+    ({ selectedId, search, appliedSearch, page } = entry.state);
+  }
+  function changePlaylist(id: string) { history.clear(); pendingPosition = null; selectedId = id; page = 0; }
   function edit(kind:"create"|"rename") {name=kind==="rename"?selected?.name || $t("Playlist {0}",0):"";saveError="";editor=kind;}
   async function save(event: SubmitEvent) {
     event.preventDefault();saveError="";
     try {
       const id = await controller.edit(editor === "create" ? {action:"create",name} : {action:"rename",playlistId:selectedId,name});
-      if (id) { selectedId=id;page=0;search="";appliedSearch="";editor=null; }
+      if (id) { history.clear();pendingPosition=null;selectedId=id;page=0;search="";appliedSearch="";editor=null; }
     } catch(cause) {saveError=errorMessage(cause);}
   }
   async function remove(work:Product) {
@@ -69,9 +94,10 @@
 </script>
 
 <section class="playlists-view">
+  <FilterBackBar visible={history.entries.length > 0} disabled={loading} onBack={back} />
   <header><h1>{$t("Playlists")}</h1><Button onclick={() => edit("create")} disabled={controller.busy}><Icon name="plus" />{$t("New playlist")}</Button></header>
   <div class="playlist-controls">
-    <label>{$t("Playlist")}<select value={selectedId} onchange={(e) => {selectedId=e.currentTarget.value;page=0;}} disabled={!controller.lists.length}>
+    <label>{$t("Playlist")}<select value={selectedId} onchange={(e) => changePlaylist(e.currentTarget.value)} disabled={!controller.lists.length}>
       {#each controller.lists as list (list.id)}<option value={list.id}>{list.name || $t("Playlist {0}",0)} ({list.workIds.length})</option>{/each}
     </select></label>
     <Button onclick={() => edit("rename")} disabled={controller.busy || !selected}>{$t("Rename playlist")}</Button>
@@ -93,7 +119,7 @@
     {#each products as product (product.workId)}<div class="playlist-item">
       <ProductCard {product} {onOpenDetails} {onCopyWorkId} {onOpenPlayer} {onOpenFolder} {onOpenDlsite} {onOpenOnline} {onDownload} activeJob={getActiveJob(product)} {onTogglePlaylist} {onChoosePlaylist}
         playlistBusy={controller.busy} inDefaultPlaylist={controller.lists.find(list=>list.id==="0")?.workIds.includes(product.workId)}
-        detailLoading={detailLoadingWorkId===product.workId} onTagSearch={(v)=>precision("tag",v)} onPrecisionSearch={precision} />
+        detailLoading={detailLoadingWorkId===product.workId} onTagSearch={(v)=>filterBy("tag",v)} onPrecisionSearch={filterBy} />
       <Button variant="text" disabled={controller.busy} onclick={()=>remove(product)}><Icon name="close" />{$t("Remove from playlist")}</Button>
     </div>{/each}
   </div>{/if}

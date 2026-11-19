@@ -723,8 +723,11 @@ impl Worker {
                             } else {
                                 requested.elapsed().as_secs_f64() * self.state.speed + 0.5
                             };
+                            // Even sub-millisecond audio pre-roll crosses a
+                            // VTT boundary. Do not release the requested clock
+                            // until decoding actually reaches that boundary.
                             !engine.seeking()
-                                && ((position >= target - 0.2 && position <= target + drift)
+                                && ((position >= target && position <= target + drift)
                                     || requested.elapsed() >= Duration::from_secs(5))
                         })
                     {

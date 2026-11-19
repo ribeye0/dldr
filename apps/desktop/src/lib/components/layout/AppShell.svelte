@@ -4,6 +4,7 @@
   import type { View } from "$lib/model/types";
   import Sidebar from "./Sidebar.svelte";
   import BackToTop from "./BackToTop.svelte";
+  import type { ListPosition } from "$lib/utils/filter-history.svelte";
   let {
     activeView,
     playerActive = false,
@@ -26,6 +27,24 @@
   let scroller: HTMLElement;
   let scrollTop = $state(0);
   const positions: Partial<Record<View, number>> = {};
+  export function capturePosition(workId?: string): ListPosition {
+    const focused = document.activeElement;
+    return { scrollTop: scroller?.scrollTop ?? 0,
+      focusLabel: focused?.getAttribute("aria-label") ?? undefined,
+      workId: workId ?? focused?.closest("[data-work-id]")?.getAttribute("data-work-id") ?? undefined };
+  }
+  export async function restorePosition(position: ListPosition, focus = true) {
+    await tick();
+    if (!scroller) return;
+    if (focus) {
+      const card = position.workId ? scroller.querySelector(`[data-work-id="${CSS.escape(position.workId)}"]`) : null;
+      const target = position.focusLabel ? (card ?? scroller).querySelector<HTMLElement>(`[aria-label="${CSS.escape(position.focusLabel)}"]`) : null;
+      (target ?? card?.querySelector<HTMLElement>(".card-title") ?? scroller.querySelector<HTMLElement>(".list-header, .playlist-pagination") ?? scroller).focus({ preventScroll: true });
+    }
+    scroller.scrollTop = position.scrollTop;
+    scrollTop = scroller.scrollTop;
+    positions[activeView] = scrollTop;
+  }
   $effect(() => {
     const view = activeView;
     void tick().then(() =>
