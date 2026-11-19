@@ -3,9 +3,9 @@
   import { t } from "$lib/i18n";
   import type { Cue } from "$lib/api/player";
   import { activeCues, mediaTime } from "./subtitles";
-  let { cues, position, offset, fontSize = 16, disabled = false, onSeek }: {
+  let { cues, position, offset, fontSize = 16, autoFollow = true, disabled = false, onSeek }: {
     cues: Cue[]; position: number; offset: number; fontSize?: number;
-    disabled?: boolean; onSeek: (position: number) => void;
+    autoFollow?: boolean; disabled?: boolean; onSeek: (position: number) => void;
   } = $props();
   let viewport = $state<HTMLDivElement>();
   let height = $state(0);
@@ -19,6 +19,11 @@
     return () => observer.disconnect();
   });
   $effect(() => {
+    if (!autoFollow) {
+      // Stop an in-flight smooth scroll as soon as free reading is enabled.
+      viewport?.scrollTo({top: viewport.scrollTop, behavior:"instant"});
+      return;
+    }
     const key = activeKey;
     const size = fontSize;
     const rows = cues;

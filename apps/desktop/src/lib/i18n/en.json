@@ -896,5 +896,8 @@
   "DLDR could not replace its files. Check folder permissions and free disk space, then try again.": "DLDR could not replace its files. Check folder permissions and free disk space, then try again.",
   "Update information is not available yet. Please try again later or visit GitHub Releases.": "Update information is not available yet. Please try again later or visit GitHub Releases.",
   "Could not update DLDR. Check your connection and try again. Details are available in Logs.": "Could not update DLDR. Check your connection and try again. Details are available in Logs.",
-  "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept."
+  "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.",
+  "Auto-follow playback": "Auto-follow playback",
+  "Turn off to browse the script freely.": "Turn off to browse the script freely.",
+  "Click the blank area of a work card to open the player.": "Click the blank area of a work card to open the player."
 }

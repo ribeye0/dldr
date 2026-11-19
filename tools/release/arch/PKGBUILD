@@ -1,6 +1,6 @@
 pkgname=dldr
 pkgver=@VERSION@
-pkgrel=1
+pkgrel=@PKGREL@
 pkgdesc='DLsite library, downloader and audio player'
 arch=('x86_64')
 url='https://github.com/ribeye0/dldr'

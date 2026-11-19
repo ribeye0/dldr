@@ -896,5 +896,8 @@
   "DLDR could not replace its files. Check folder permissions and free disk space, then try again.": "DLDR のファイルを置き換えられませんでした。フォルダーの権限と空き容量を確認し、再試行してください。",
   "Update information is not available yet. Please try again later or visit GitHub Releases.": "更新情報を取得できません。後でもう一度試すか GitHub Releases を確認してください。",
   "Could not update DLDR. Check your connection and try again. Details are available in Logs.": "DLDR を更新できませんでした。接続を確認し、再試行してください。詳細は Logs で確認できます。",
-  "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "新しいバージョンを確認し、ダウンロード後に DLDR を再起動します。アカウント、ライブラリ、ダウンロード済み作品は保持されます。"
+  "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "新しいバージョンを確認し、ダウンロード後に DLDR を再起動します。アカウント、ライブラリ、ダウンロード済み作品は保持されます。",
+  "Auto-follow playback": "再生位置に自動追従",
+  "Turn off to browse the script freely.": "オフにすると台本を自由にスクロールできます。",
+  "Click the blank area of a work card to open the player.": "作品カードの余白をクリックすると、プレーヤーが開きます。"
 }

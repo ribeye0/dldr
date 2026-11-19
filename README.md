@@ -37,8 +37,8 @@ Choose a package from [Releases](https://github.com/ribeye0/dldr/releases/latest
 For example, on Linux:
 
 ```sh
-chmod +x DLDR_0.1.2_amd64.AppImage
-./DLDR_0.1.2_amd64.AppImage
+chmod +x DLDR_0.1.3_amd64.AppImage
+./DLDR_0.1.3_amd64.AppImage
 ```
 
 Use the version you downloaded. If FUSE is unavailable, add `--appimage-extract-and-run`.
@@ -96,7 +96,7 @@ By default, DLDR extracts supported archives and deletes them only after success
 
 In **Downloaded**, click a card's blank area to open the bottom-right player, then choose a track. Expand it for the track list, script and playback settings; drag the top handle down to collapse it without stopping playback.
 
-Subtitles are matched by filename: `foo.wav.vtt` pairs with `foo.wav`. You can also choose a VTT file from the player's subtitle list and adjust its timing offset. The current line is centered and highlighted in the script view.
+Subtitles are matched by filename: `foo.wav.vtt` pairs with `foo.wav`. You can also choose a VTT file from the player's subtitle list and adjust its timing offset. The current line is centered and highlighted in the script view. Turn off **Auto-follow playback** above the script to browse freely; your choice is remembered.
 
 The upper-right playlist icon toggles a work in your default playlist, even before downloading. Right-click to choose another playlist. Create and rename lists from **Playlists**.
 

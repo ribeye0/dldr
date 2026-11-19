@@ -896,5 +896,8 @@
   "DLDR could not replace its files. Check folder permissions and free disk space, then try again.": "DLDR 无法替换文件。请检查文件夹权限与剩余空间后重试。",
   "Update information is not available yet. Please try again later or visit GitHub Releases.": "目前尚无可用的更新信息。请稍后重试或前往 GitHub Releases。",
   "Could not update DLDR. Check your connection and try again. Details are available in Logs.": "无法更新 DLDR。请检查网络后重试，详细信息可到 Logs 查看。",
-  "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "检查新版本，下载后重新启动 DLDR。账号、作品库与已下载作品都会保留。"
+  "Check for a new version, download it and restart DLDR. Your account, library and downloaded works will be kept.": "检查新版本，下载后重新启动 DLDR。账号、作品库与已下载作品都会保留。",
+  "Auto-follow playback": "自动跟随播放",
+  "Turn off to browse the script freely.": "关闭后可自由翻阅台本。",
+  "Click the blank area of a work card to open the player.": "点击作品卡片的空白处，即可打开播放器。"
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick, untrack } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { t } from "$lib/i18n";
   import type { PlayerController } from "$lib/controllers/player-controller.svelte";
   import { mediaTime } from "./subtitles";
@@ -9,6 +9,17 @@
   let { player, onExpand }: { player: PlayerController; onExpand?: () => void } = $props();
   let group = $state(""); let tab = $state<"tracks" | "script">("tracks");
   let settingsOpen = $state(false); let fontSize = $state(16);
+  const followStorageKey = "dldr.player.follow-subtitles";
+  let followPlayback = $state(true);
+  onMount(() => {
+    try { followPlayback = localStorage.getItem(followStorageKey) !== "false"; }
+    catch { /* Keep the default when browser storage is unavailable. */ }
+  });
+  function setFollowPlayback(enabled: boolean) {
+    followPlayback = enabled;
+    try { localStorage.setItem(followStorageKey, String(enabled)); }
+    catch { /* The switch still works for this session. */ }
+  }
   let panel = $state<HTMLElement>(); let toggle = $state<HTMLButtonElement>();
   let drag: { id: number; startY: number; handle: HTMLButtonElement } | null = null;
   let dragging = $state(false); let dragOffset = $state(0);
@@ -149,7 +160,12 @@
                 {#if player.subtitleLoading}<p class="player-message" role="status">{$t("Loading…")}</p>
                 {:else if !s.subtitleId}<div class="script-empty"><Icon name="script" /><p>{$t("Select a VTT subtitle file to display captions.")}</p><button onclick={() => settingsOpen = true}>{$t("Player settings")}</button></div>
                 {:else if !player.cues.length}<p class="player-message">{$t("No subtitle at this position.")}</p>
-                {:else}<ScriptView cues={player.cues} {position} offset={s.subtitleOffset} {fontSize} disabled={seekBlocked || !s.trackId} onSeek={(position) => player.run({action:"seek",position})} />{/if}
+                {:else}
+                  <div class="script-toolbar">
+                    <label class="follow-toggle"><span>{$t("Auto-follow playback")}</span><input class="follow-switch" type="checkbox" role="switch" checked={followPlayback} onchange={(event) => setFollowPlayback(event.currentTarget.checked)} aria-describedby="subtitle-follow-hint" /></label>
+                    <p id="subtitle-follow-hint" class="player-hint">{$t("Turn off to browse the script freely.")}</p>
+                  </div>
+                  <ScriptView cues={player.cues} {position} offset={s.subtitleOffset} {fontSize} autoFollow={followPlayback} disabled={seekBlocked || !s.trackId} onSeek={(position) => player.run({action:"seek",position})} />{/if}
               </section>
             {/if}
           {/if}
@@ -230,6 +246,12 @@
   .settings-actions { display:flex; flex-wrap:wrap; gap:8px; }
   .settings-actions button { display:flex; gap:5px; align-items:center; font-size:14px; }
   .player-hint { margin:0; font-size:13px; line-height:1.6; color:var(--dldr-color-ui-dim); }
+  .script-toolbar { display:grid; gap:4px; margin-bottom:10px; }
+  label.follow-toggle { flex-direction:row; align-items:center; justify-content:space-between; gap:12px; font-size:14px; cursor:pointer; }
+  input.follow-switch { appearance:none; flex:none; width:40px; height:24px; margin:0; padding:3px; border:1px solid var(--dldr-color-ui-line); border-radius:999px; background:var(--dldr-color-ui-line-subtle); cursor:pointer; }
+  input.follow-switch::before { content:""; display:block; width:16px; height:16px; border-radius:50%; background:var(--dldr-color-ui-surface); box-shadow:0 1px 3px var(--dldr-color-ui-shadow); transition:transform .15s; }
+  input.follow-switch:checked { background:var(--dldr-color-ui-accent); border-color:var(--dldr-color-ui-accent); }
+  input.follow-switch:checked::before { transform:translateX(16px); background:var(--dldr-color-ui-on-accent); }
   .group-picker { margin-bottom:10px; }
   .track-list { list-style:none; margin:0; padding:0; height:clamp(180px,32dvh,320px); overflow:auto; scrollbar-width:thin; overscroll-behavior:contain; }
   .track-list li + li { margin-top:6px; }
@@ -247,5 +269,5 @@
   @media(max-width:760px) { .player-dock { width:min(380px,calc(100vw - 32px)); right:16px; } }
   @media(max-height:720px) { .artwork { width:72px; height:72px; margin-bottom:8px; } }
   @media(max-width:620px) { .player-dock { bottom:12px; right:12px; width:calc(100vw - 24px); max-width:400px; } .player-panel { max-height:calc(100dvh - 24px); } .panel-body { padding-inline:14px; } .transport { gap:12px; } }
-  @media(prefers-reduced-motion:reduce) { .mini-progress span,.player-dock.expanded { transition:none; } }
+  @media(prefers-reduced-motion:reduce) { .mini-progress span,.player-dock.expanded,input.follow-switch::before { transition:none; } }
 </style>

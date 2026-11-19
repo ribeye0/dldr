@@ -19,6 +19,7 @@ async function centered(page) {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(url);await page.locator('.product-card').first().waitFor();
   await page.locator('aside nav').getByRole('button',{name:'Downloaded',exact:true}).click();
+  await page.locator('.downloaded-player-hint').getByText('Click the blank area of a work card to open the player.',{exact:true}).waitFor();
   await page.locator('.card-play-target').first().click({position:{x:6,y:6}});
   const dock=page.locator('.player-dock');
   const panel=page.getByRole('dialog',{name:'Audio player',exact:true});await panel.waitFor();
@@ -130,6 +131,25 @@ async function centered(page) {
    assert.ok((await highlighted.innerText()).includes(expected));
   }
   assert.deepEqual(await page.evaluate(()=>({page:document.querySelector('.workspace').scrollTop,panel:document.querySelector('.panel-body').scrollTop})),outerBefore);
+  const follow=panel.getByRole('switch',{name:'Auto-follow playback',exact:true});
+  assert.equal(await follow.isChecked(),true);
+  await follow.uncheck();
+  const readingTop=await panel.locator('.script-viewport').evaluate(el=>{el.scrollTop=700;return el.scrollTop;});
+  for(const position of [1,251,71]) {
+   await page.evaluate(async position=>{
+    const state=await window.__TAURI_INTERNALS__.invoke('player_snapshot');state.position=position;state.revision++;
+    await window.__TAURI_INTERNALS__.invoke('plugin:event|emit',{event:'dldr-player-state',payload:state});
+   },position);
+   await page.waitForFunction(position=>document.querySelector('.script-viewport button.active .cue-time')?.textContent===`${Math.floor(position/60)}:${String(Math.floor(position%60/10)*10).padStart(2,'0')}`,position);
+   assert.ok(Math.abs(await panel.locator('.script-viewport').evaluate(el=>el.scrollTop)-readingTop)<1,'Clock events must not move the script while following is off');
+  }
+  await panel.getByRole('button',{name:'Collapse player',exact:true}).click();
+  await dock.locator('.mini-identity').click();
+  assert.equal(await follow.isChecked(),false,'Collapsing the player keeps free-reading mode');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('dldr.player.follow-subtitles')),'false');
+  await page.screenshot({path:path.join(captures,'player-follow-off.png')});
+  await follow.focus();await page.keyboard.press('Space');await centered(page);
+  assert.equal(await follow.isChecked(),true,'Enabling follow returns to the current cue');
   // Return to a normal fixture clock, then collapse without stopping playback.
   await panel.getByRole('button',{name:'Collapse player',exact:true}).click();await panel.waitFor({state:'hidden'});
   assert.equal(await dock.locator('.mini-player').count(),1);
@@ -165,12 +185,20 @@ async function centered(page) {
   await page.locator('aside nav').getByRole('button',{name:'Settings',exact:true}).click();
   await dock.getByRole('button',{name:'Pause',exact:true}).click();
   await dock.getByRole('button',{name:'Play',exact:true}).waitFor();
-  for(const [locale,title] of [['zh-TW','音訊播放器'],['zh-CN','音频播放器'],['ja','オーディオプレーヤー'],['en','Audio player']]) {
+  for(const [locale,title,followLabel,hint] of [
+   ['zh-TW','音訊播放器','自動跟隨播放','點擊作品卡片的空白處，即可開啟播放器。'],
+   ['zh-CN','音频播放器','自动跟随播放','点击作品卡片的空白处，即可打开播放器。'],
+   ['ja','オーディオプレーヤー','再生位置に自動追従','作品カードの余白をクリックすると、プレーヤーが開きます。'],
+   ['en','Audio player','Auto-follow playback','Click the blank area of a work card to open the player.']]) {
    await page.locator('#ui-locale').selectOption(locale);
    await dock.locator('.mini-identity').click();
    await page.getByRole('dialog',{name:title,exact:true}).waitFor();
+   await page.getByRole('switch',{name:followLabel,exact:true}).waitFor();
    await page.keyboard.press('Escape');await page.locator('.player-panel').waitFor({state:'hidden'});
    assert.equal(await page.locator('.mini-identity').evaluate(el=>el===document.activeElement),true);
+   await page.locator('aside nav button[data-view=downloaded]').click();
+   await page.locator('.downloaded-player-hint').getByText(hint,{exact:true}).waitFor();
+   await page.locator('aside nav button[data-view=settings]').click();
   }
   // Expanded panel stays nonmodal; background navigation remains available.
   await dock.locator('.mini-identity').click();
@@ -211,7 +239,27 @@ async function centered(page) {
   await panel.getByRole('button',{name:'Player settings',exact:true}).click();
   await panel.getByRole('button',{name:'Stop playback',exact:true}).click();
   await panel.getByText('Choose a track',{exact:true}).waitFor();
+  await page.setViewportSize({width:1360,height:1000});
+  await panel.getByRole('button',{name:'Collapse player',exact:true}).click();
+  await page.locator('aside nav button[data-view=downloaded]').click();
+  await page.screenshot({path:path.join(captures,'downloaded-player-hint.png')});
+  // The preference survives a fresh app mount, independent of playback history.
+  await page.evaluate(()=>localStorage.setItem('dldr.player.follow-subtitles','false'));
+  await page.reload();await page.locator('.product-card').first().waitFor();
+  await page.locator('aside nav button[data-view=downloaded]').click();
+  await page.locator('.card-play-target').first().click({position:{x:6,y:6}});
+  await panel.locator('.track-list button').first().click();
+  await follow.waitFor();assert.equal(await follow.isChecked(),false);
+  await follow.check();
+  await panel.getByRole('slider',{name:'Playback position',exact:true}).fill('2');
+  await panel.getByRole('slider',{name:'Playback position',exact:true}).dispatchEvent('change');
+  await centered(page);
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:true,captures,locales:4,checks:['right-corner dock','nonmodal collapse','mouse/touch drag and cancellation','keyboard handle','drag shielded from native clock','latest seek wins with slow IPC','keyboard seeking','larger player controls','16px default and 14/18px sizes','track groups','controls','centered first/middle/last script','overlapping cues','passive clock','offset and click seek','isolated scrolling','background navigation','download panel coordination','four locales','800/390/320px','stop']}));
+  console.log(JSON.stringify({passed:true,captures,locales:4,checks:['right-corner dock','nonmodal collapse','mouse/touch drag and cancellation','keyboard handle','drag shielded from native clock','latest seek wins with slow IPC','keyboard seeking','larger player controls','16px default and 14/18px sizes','track groups','controls','centered first/middle/last script','overlapping cues','passive clock','manual script browsing while clock advances','keyboard follow switch returns to current cue','follow preference survives collapse and reload','downloaded player hint in four languages','offset and click seek','isolated scrolling','background navigation','download panel coordination','four locales','800/390/320px','stop']}));
+ } catch(error) {
+  const page=browser.contexts()[0]?.pages()[0];
+  if(page) await page.screenshot({path:path.join(captures,'failure.png'),fullPage:true});
+  console.error('QA captures:',captures);
+  throw error;
  } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

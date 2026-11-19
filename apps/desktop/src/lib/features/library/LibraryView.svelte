@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from "$lib/i18n";
   import UiButton from "$lib/components/ui/ActionButton.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import Pagination from "$lib/components/ui/Pagination.svelte";
   import type {
     Product,
@@ -169,7 +170,11 @@
   />
 
   {#if downloadedOnly}
-    <p class="dldr:mt-0 dldr:mb-5 dldr:text-sm dldr:text-ui-dim">{$t("Completed downloads and imported local works. Click a tag to search this list.")}</p>
+    <div class="downloaded-player-hint" role="note">
+      <span class="player-hint-icon" aria-hidden="true"><Icon name="play" /></span>
+      <div><strong>{$t("Click the blank area of a work card to open the player.")}</strong>
+        <p>{$t("Completed downloads and imported local works. Click a tag to search this list.")}</p></div>
+    </div>
   {/if}
 
   {#if filtersOpen}
@@ -264,6 +269,11 @@
 </section>
 
 <style>
+  .downloaded-player-hint { display:flex; align-items:center; gap:12px; margin:0 0 20px; padding:14px 16px; border:1px solid var(--dldr-color-ui-line-subtle); border-left:4px solid var(--dldr-color-ui-accent); border-radius:12px; background:var(--dldr-color-ui-status-bg); color:var(--dldr-color-ui-ink); line-height:1.6; }
+  .player-hint-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:50%; background:var(--dldr-color-ui-accent); color:var(--dldr-color-ui-on-accent); }
+  .player-hint-icon :global(svg) { width:20px; height:20px; }
+  .downloaded-player-hint strong { display:block; font-size:15px; font-weight:700; }
+  .downloaded-player-hint p { margin:3px 0 0; font-size:13px; color:var(--dldr-color-ui-dim); }
   .product-area {
     display: flex;
     flex-direction: column;

@@ -25,7 +25,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'target/dist/arch')
     parser.add_argument('--reuse-build', action='store_true', help='Package unchanged native binaries')
+    parser.add_argument('--pkgrel', type=int, default=1, help='Arch package revision (default: 1)')
     args = parser.parse_args()
+    if args.pkgrel < 1:
+        parser.error('--pkgrel must be a positive integer')
     os.chdir(ROOT)
     if 'ID=arch\n' not in Path('/etc/os-release').read_text() or os.uname().machine != 'x86_64':
         parser.error('Run this build on Arch Linux x86_64.')
@@ -77,12 +80,12 @@ def main():
         payload = work / 'payload.tar'
         run('tar', '-cf', str(payload), '-C', str(work), 'payload')
         digest = hashlib.file_digest(payload.open('rb'), 'sha256').hexdigest()
-        recipe = (ROOT / 'tools/release/arch/PKGBUILD').read_text().replace('@VERSION@', version).replace('@SHA256@', digest)
+        recipe = (ROOT / 'tools/release/arch/PKGBUILD').read_text().replace('@VERSION@', version).replace('@PKGREL@', str(args.pkgrel)).replace('@SHA256@', digest)
         (work / 'PKGBUILD').write_text(recipe)
         env = os.environ | {'PKGDEST': str(output), 'PACKAGER': 'ribeye0',
                             'SOURCE_DATE_EPOCH': run('git', 'log', '-1', '--format=%ct', capture=True)}
         run('makepkg', '--clean', '--force', cwd=work, env=env)
-    package = output / f'dldr-{version}-1-x86_64.pkg.tar.zst'
+    package = output / f'dldr-{version}-{args.pkgrel}-x86_64.pkg.tar.zst'
     run('pacman', '-Qip', str(package))
     (output / 'SHA256SUMS.txt').write_text(hashlib.file_digest(package.open('rb'), 'sha256').hexdigest() + '  ' + package.name + '\n')
     print(f'Arch package: {package}')
